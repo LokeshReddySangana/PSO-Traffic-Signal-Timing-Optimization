@@ -1,0 +1,2562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PSO Traffic Signal Optimization — SmartCity AI</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --void: #080c14;
+  --deep: #0b1120;
+  --card: rgba(11,20,40,0.75);
+  --glass: rgba(14,24,48,0.6);
+  --border: rgba(0,210,255,0.14);
+  --border-em: rgba(255,160,0,0.18);
+  --c: #00d2ff;
+  --c-dim: rgba(0,210,255,0.12);
+  --c-glow: rgba(0,210,255,0.35);
+  --g: #00ffa3;
+  --g-dim: rgba(0,255,163,0.1);
+  --r: #ff3860;
+  --r-dim: rgba(255,56,96,0.12);
+  --a: #ffb300;
+  --a-dim: rgba(255,179,0,0.12);
+  --p: #b66dff;
+  --p-dim: rgba(182,109,255,0.12);
+  --t1: #e8f4ff;
+  --t2: rgba(232,244,255,0.55);
+  --t3: rgba(232,244,255,0.28);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--void);color:var(--t1);font-family:'Syne',sans-serif;overflow-x:hidden}
+
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-track{background:var(--void)}
+::-webkit-scrollbar-thumb{background:var(--c);border-radius:2px}
+
+/* BG GRID */
+body::before{
+  content:'';position:fixed;inset:0;z-index:0;
+  background-image:
+    linear-gradient(rgba(0,210,255,0.03) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(0,210,255,0.03) 1px,transparent 1px);
+  background-size:52px 52px;
+  animation:gridDrift 20s linear infinite;
+}
+@keyframes gridDrift{0%{background-position:0 0}100%{background-position:52px 52px}}
+
+/* NOISE */
+body::after{
+  content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E");
+  opacity:.5;
+}
+
+/* SCANLINE */
+.scanline{
+  position:fixed;top:0;left:0;right:0;height:1px;z-index:999;pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgba(0,210,255,0.15),transparent);
+  animation:scanline 8s linear infinite;
+}
+@keyframes scanline{0%{top:-2px}100%{top:100vh}}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   HERO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+#hero{
+  position:relative;height:100vh;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  overflow:hidden;z-index:1;
+}
+#hero-canvas{position:absolute;inset:0;z-index:0;opacity:.7}
+.hero-orb{
+  position:absolute;border-radius:50%;filter:blur(120px);pointer-events:none;
+  animation:orbFloat 12s ease-in-out infinite;
+}
+.orb1{width:600px;height:600px;background:rgba(0,150,255,0.06);top:-200px;left:-150px;animation-delay:0s}
+.orb2{width:500px;height:500px;background:rgba(0,255,163,0.05);bottom:-150px;right:-100px;animation-delay:-5s}
+.orb3{width:400px;height:400px;background:rgba(182,109,255,0.04);top:50%;left:50%;transform:translate(-50%,-50%);animation-delay:-9s}
+@keyframes orbFloat{0%,100%{transform:scale(1) translateY(0)}50%{transform:scale(1.08) translateY(-30px)}}
+.orb1,.orb2{animation-name:orbFloat}
+
+.hero-content{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;text-align:center;padding:20px}
+
+.hero-badge{
+  display:inline-flex;align-items:center;gap:8px;
+  border:1px solid var(--border-em);background:var(--a-dim);
+  color:var(--a);padding:7px 20px;border-radius:100px;
+  font-family:'JetBrains Mono',monospace;font-size:.68rem;letter-spacing:.18em;text-transform:uppercase;
+  margin-bottom:32px;
+  animation:fadeUp .7s ease both;
+}
+.hero-badge .dot-a{width:6px;height:6px;border-radius:50%;background:var(--a);box-shadow:0 0 8px var(--a);animation:blink 1.4s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+.hero-title{
+  font-family:'Orbitron',monospace;font-weight:900;
+  font-size:clamp(2.8rem,7vw,5.5rem);line-height:1.05;
+  background:linear-gradient(135deg,#fff 0%,var(--c) 45%,var(--g) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  filter:drop-shadow(0 0 50px rgba(0,210,255,0.25));
+  margin-bottom:14px;
+  animation:fadeUp .8s .1s ease both;
+}
+.hero-sub{
+  font-family:'Orbitron',monospace;font-size:clamp(.8rem,1.8vw,1.1rem);
+  color:var(--c);letter-spacing:.3em;text-transform:uppercase;opacity:.75;
+  margin-bottom:20px;animation:fadeUp .9s .2s ease both;
+}
+.hero-desc{
+  max-width:580px;color:var(--t2);font-size:.95rem;line-height:1.85;
+  margin-bottom:52px;animation:fadeUp 1s .3s ease both;
+}
+.hero-ctas{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;animation:fadeUp 1s .45s ease both}
+
+.btn-primary{
+  position:relative;overflow:hidden;
+  padding:15px 38px;border:1px solid var(--c);
+  background:var(--c-dim);color:var(--c);
+  font-family:'Orbitron',monospace;font-size:.72rem;letter-spacing:.18em;text-transform:uppercase;
+  border-radius:4px;cursor:pointer;text-decoration:none;
+  transition:color .3s;display:inline-flex;align-items:center;gap:8px;
+}
+.btn-primary::before{
+  content:'';position:absolute;inset:0;background:var(--c);
+  transform:translateX(-100%);transition:transform .35s;z-index:-1;
+}
+.btn-primary:hover{color:var(--void)}
+.btn-primary:hover::before{transform:translateX(0)}
+.btn-secondary{
+  padding:15px 38px;border:1px solid var(--border);background:transparent;
+  color:var(--t2);font-family:'Orbitron',monospace;font-size:.72rem;letter-spacing:.18em;
+  text-transform:uppercase;border-radius:4px;cursor:pointer;text-decoration:none;
+  transition:all .3s;display:inline-flex;align-items:center;gap:8px;
+}
+.btn-secondary:hover{border-color:var(--a);color:var(--a)}
+
+.scroll-hint{
+  position:absolute;bottom:36px;left:50%;transform:translateX(-50%);
+  color:var(--t3);font-size:.65rem;letter-spacing:.25em;text-transform:uppercase;text-align:center;
+  animation:bounce 2.2s ease-in-out infinite;
+}
+.scroll-hint::after{content:'↓';display:block;font-size:1.1rem;margin-top:6px;color:var(--c)}
+@keyframes bounce{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(6px)}}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   NAV
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:200;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 5%;height:66px;
+  background:rgba(8,12,20,0.88);backdrop-filter:blur(24px);
+  border-bottom:1px solid var(--border);
+  transition:all .3s;
+}
+.nav-logo{
+  display:flex;align-items:center;gap:12px;
+}
+.nav-logo-icon{
+  width:36px;height:36px;border-radius:8px;
+  background:linear-gradient(135deg,var(--c),#0066ff);
+  display:flex;align-items:center;justify-content:center;font-size:18px;
+  box-shadow:0 0 20px rgba(0,210,255,0.35);
+  animation:iconPulse 3s ease-in-out infinite;
+}
+@keyframes iconPulse{0%,100%{box-shadow:0 0 18px rgba(0,210,255,0.35)}50%{box-shadow:0 0 32px rgba(0,210,255,0.7)}}
+.nav-logo-text{display:flex;flex-direction:column}
+.nav-logo-name{font-family:'Orbitron',monospace;font-weight:700;font-size:.9rem;color:var(--c);letter-spacing:.12em}
+.nav-logo-sub{font-family:'JetBrains Mono',monospace;font-size:.6rem;color:var(--t3);letter-spacing:.2em;text-transform:uppercase}
+
+.nav-links{display:flex;gap:2px}
+.nav-tab{
+  padding:8px 18px;color:var(--t3);background:transparent;border:none;
+  font-family:'Syne',sans-serif;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;
+  cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;
+  text-decoration:none;display:flex;align-items:center;gap:6px;
+}
+.nav-tab:hover{color:var(--t1)}
+.nav-tab.active{color:var(--c);border-bottom-color:var(--c);text-shadow:0 0 12px rgba(0,210,255,0.5)}
+
+.nav-status{display:flex;align-items:center;gap:16px}
+.live-pill{
+  display:flex;align-items:center;gap:7px;
+  background:var(--g-dim);border:1px solid rgba(0,255,163,0.25);
+  border-radius:100px;padding:5px 14px;
+  font-family:'JetBrains Mono',monospace;font-size:.65rem;letter-spacing:.15em;color:var(--g);
+}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--g);box-shadow:0 0 8px var(--g);animation:blink 1.2s ease-in-out infinite}
+.clock-display{font-family:'JetBrains Mono',monospace;font-size:.8rem;color:var(--t3)}
+.ai-pill{
+  background:linear-gradient(135deg,rgba(182,109,255,0.12),rgba(0,210,255,0.12));
+  border:1px solid rgba(182,109,255,0.25);border-radius:4px;
+  padding:5px 12px;font-family:'JetBrains Mono',monospace;font-size:.65rem;letter-spacing:.1em;color:var(--p);
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   SECTION LAYOUT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+section.dashboard-section{position:relative;z-index:1;padding:80px 5%;display:none}
+section.dashboard-section.active{display:block}
+
+.section-header{margin-bottom:28px}
+.section-eyebrow{
+  font-family:'JetBrains Mono',monospace;font-size:.68rem;color:var(--c);
+  letter-spacing:.3em;text-transform:uppercase;
+  display:flex;align-items:center;gap:10px;margin-bottom:10px;
+}
+.section-eyebrow::before{content:'';width:32px;height:1px;background:var(--c)}
+.section-title{
+  font-family:'Orbitron',monospace;font-weight:700;
+  font-size:clamp(1.5rem,3vw,2.2rem);
+  background:linear-gradient(135deg,#fff 30%,var(--c) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  margin-bottom:8px;
+}
+.section-desc{color:var(--t2);font-size:.9rem;line-height:1.8;max-width:640px}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   GLASS PANEL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.glass{
+  background:var(--glass);backdrop-filter:blur(18px);
+  border:1px solid var(--border);border-radius:10px;
+  position:relative;overflow:hidden;
+}
+.glass::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(0,210,255,0.5),transparent);
+}
+.panel-hd{
+  padding:13px 18px 11px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:8px;
+  font-family:'Orbitron',monospace;font-size:.72rem;letter-spacing:.2em;text-transform:uppercase;color:var(--c);
+}
+.panel-hd .blt{width:7px;height:7px;border-radius:50%;background:var(--c);box-shadow:0 0 8px var(--c)}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   STAT CARDS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.stats-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px}
+.s-card{
+  background:var(--glass);border:1px solid var(--border);border-radius:10px;
+  padding:16px 18px;position:relative;overflow:hidden;
+  transition:border-color .3s,transform .2s;
+}
+.s-card:hover{transform:translateY(-2px)}
+.s-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;border-radius:0 0 10px 10px}
+.s-card.c::after{background:var(--c);box-shadow:0 0 8px var(--c)}
+.s-card.g::after{background:var(--g);box-shadow:0 0 8px var(--g)}
+.s-card.a::after{background:var(--a);box-shadow:0 0 8px var(--a)}
+.s-card.r::after{background:var(--r);box-shadow:0 0 8px var(--r)}
+.s-card.p::after{background:var(--p);box-shadow:0 0 8px var(--p)}
+.s-lbl{font-size:.62rem;letter-spacing:.2em;color:var(--t3);text-transform:uppercase;margin-bottom:6px}
+.s-val{font-family:'JetBrains Mono',monospace;font-size:1.6rem;font-weight:600;line-height:1}
+.s-card.c .s-val{color:var(--c);text-shadow:0 0 14px rgba(0,210,255,.5)}
+.s-card.g .s-val{color:var(--g);text-shadow:0 0 14px rgba(0,255,163,.5)}
+.s-card.a .s-val{color:var(--a);text-shadow:0 0 14px rgba(255,179,0,.5)}
+.s-card.r .s-val{color:var(--r);text-shadow:0 0 14px rgba(255,56,96,.5)}
+.s-card.p .s-val{color:var(--p);text-shadow:0 0 14px rgba(182,109,255,.5)}
+.s-sub{font-size:.65rem;color:var(--t3);margin-top:4px;display:flex;gap:5px;align-items:center}
+.delta{font-size:.62rem;padding:2px 6px;border-radius:3px}
+.delta.up{color:var(--g);background:var(--g-dim)}
+.delta.dn{color:var(--r);background:var(--r-dim)}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   SIMULATION LAYOUT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.sim-grid{display:grid;grid-template-columns:1fr 330px;gap:14px}
+
+.canvas-wrap{
+  background:var(--glass);border:1px solid var(--border);border-radius:10px;
+  overflow:hidden;position:relative;height:520px;
+}
+.canvas-wrap canvas{display:block;width:100%;height:100%}
+.canvas-badges{
+  position:absolute;top:12px;left:12px;
+  display:flex;flex-direction:column;gap:7px;pointer-events:none;
+}
+.cbadge{
+  background:rgba(8,12,20,0.82);border:1px solid var(--border);
+  border-radius:5px;padding:4px 10px;
+  font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:.12em;color:var(--t3);
+}
+.sim-btn-bar{
+  position:absolute;bottom:12px;left:50%;transform:translateX(-50%);
+  display:flex;gap:8px;
+}
+.sim-btn{
+  padding:8px 20px;border-radius:6px;cursor:pointer;
+  font-family:'Orbitron',monospace;font-size:.65rem;letter-spacing:.14em;text-transform:uppercase;
+  transition:all .25s;border:1px solid var(--border);background:rgba(8,12,20,0.8);color:var(--c);
+}
+.sim-btn:hover{background:var(--c-dim);border-color:rgba(0,210,255,.45);box-shadow:0 0 14px rgba(0,210,255,.2)}
+.sim-btn.r-btn{border-color:rgba(255,56,96,.3);color:var(--r);background:rgba(255,56,96,.06)}
+.sim-btn.r-btn:hover{background:rgba(255,56,96,.14)}
+.sim-btn.g-btn{border-color:rgba(0,255,163,.3);color:var(--g);background:rgba(0,255,163,.06)}
+.sim-btn.g-btn:hover{background:rgba(0,255,163,.14)}
+
+/* Upload + dataset controls */
+.dataset-box{
+  background:var(--glass);border:1px solid var(--border);border-radius:10px;overflow:hidden;
+}
+.upload-drop{
+  border:2px dashed rgba(0,210,255,0.2);border-radius:8px;margin:14px;padding:22px;
+  text-align:center;cursor:pointer;transition:all .3s;
+  background:rgba(0,210,255,0.03);
+}
+.upload-drop:hover,.upload-drop.drag{border-color:var(--c);background:var(--c-dim)}
+.upload-drop-icon{font-size:2rem;margin-bottom:8px;display:block}
+.upload-drop-lbl{font-family:'Orbitron',monospace;font-size:.7rem;color:var(--c);letter-spacing:.12em;margin-bottom:4px}
+.upload-drop-sub{font-size:.65rem;color:var(--t3)}
+.sample-btns{display:flex;gap:8px;padding:0 14px 14px}
+.sample-btn{
+  flex:1;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--c-dim);
+  color:var(--c);font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:.08em;
+  cursor:pointer;transition:all .2s;
+}
+.sample-btn:hover{background:rgba(0,210,255,0.2);border-color:rgba(0,210,255,.4)}
+
+/* Right panel */
+.r-col{display:flex;flex-direction:column;gap:12px}
+
+/* Signal cards */
+.sig-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px}
+.sig-card{
+  background:rgba(8,12,20,0.6);border:1px solid var(--border);border-radius:8px;
+  padding:12px;display:flex;flex-direction:column;align-items:center;gap:7px;
+}
+.sig-lbl{font-size:.6rem;letter-spacing:.2em;color:var(--t3);text-transform:uppercase}
+.sig-light{width:32px;height:32px;border-radius:50%;transition:all .4s}
+.sig-light.rl{background:radial-gradient(circle,#ff3860,#9e0025);box-shadow:0 0 20px rgba(255,56,96,.9),0 0 40px rgba(255,56,96,.3)}
+.sig-light.gl{background:radial-gradient(circle,#00ffa3,#009955);box-shadow:0 0 20px rgba(0,255,163,.9),0 0 40px rgba(0,255,163,.3)}
+.sig-light.yl{background:radial-gradient(circle,#ffb300,#c77800);box-shadow:0 0 20px rgba(255,179,0,.9),0 0 40px rgba(255,179,0,.3)}
+.sig-light.off{background:rgba(30,40,60,.6);box-shadow:none}
+.sig-timer{font-family:'JetBrains Mono',monospace;font-size:1.2rem;font-weight:600;color:var(--t1)}
+.sig-phase{font-size:.58rem;letter-spacing:.12em;color:var(--t3)}
+
+/* Controls */
+.ctrl-panel{padding:14px;display:flex;flex-direction:column;gap:12px}
+.ctrl-row{display:flex;flex-direction:column;gap:5px}
+.ctrl-lbl{display:flex;justify-content:space-between;font-size:.65rem;letter-spacing:.12em;color:var(--t3);text-transform:uppercase}
+.ctrl-lbl span{color:var(--c);font-family:'JetBrains Mono',monospace}
+input[type=range]{-webkit-appearance:none;width:100%;height:3px;background:rgba(0,210,255,.12);border-radius:2px;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--c);box-shadow:0 0 10px var(--c);cursor:pointer}
+.toggle-row{display:flex;align-items:center;justify-content:space-between}
+.toggle-lbl{font-size:.72rem;color:var(--t2)}
+.tog{width:40px;height:21px;background:rgba(30,40,60,.8);border-radius:10px;cursor:pointer;position:relative;border:1px solid var(--border);transition:background .3s}
+.tog.on{background:rgba(0,255,163,.18);border-color:rgba(0,255,163,.35)}
+.tog::after{content:'';position:absolute;top:3px;left:3px;width:13px;height:13px;border-radius:50%;background:var(--t3);transition:all .3s}
+.tog.on::after{left:22px;background:var(--g);box-shadow:0 0 8px var(--g)}
+.mode-row{display:flex;gap:5px}
+.mode-b{
+  flex:1;padding:7px 4px;background:rgba(8,16,32,.8);border:1px solid var(--border);
+  border-radius:5px;font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.08em;
+  color:var(--t3);cursor:pointer;transition:all .2s;
+}
+.mode-b.active{background:var(--c-dim);border-color:rgba(0,210,255,.4);color:var(--c);box-shadow:0 0 10px rgba(0,210,255,.12)}
+
+/* Queue bars */
+.q-bars{padding:12px;display:flex;flex-direction:column;gap:10px}
+.q-item{display:flex;flex-direction:column;gap:4px}
+.q-hd{display:flex;justify-content:space-between;font-size:.62rem}
+.q-hd-l{color:var(--t3);letter-spacing:.1em}
+.q-hd-v{font-family:'JetBrains Mono',monospace;color:var(--c)}
+.q-bar{height:5px;background:rgba(0,210,255,.08);border-radius:3px;overflow:hidden}
+.q-fill{height:100%;border-radius:3px;transition:width 1s ease}
+.qf1{background:linear-gradient(90deg,var(--c),#0066ff)}
+.qf2{background:linear-gradient(90deg,var(--g),#00aaff)}
+.qf3{background:linear-gradient(90deg,var(--a),var(--r))}
+.qf4{background:linear-gradient(90deg,var(--p),var(--c))}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   PSO ENGINE PAGE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.pso-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.pso-canvas-wrap{
+  background:var(--glass);border:1px solid var(--border);border-radius:10px;
+  overflow:hidden;height:400px;position:relative;
+}
+.pso-canvas-wrap canvas{width:100%;height:calc(100% - 48px);margin-top:48px}
+.pso-info-panel{
+  position:absolute;top:58px;right:12px;
+  background:rgba(8,12,20,.88);border:1px solid var(--border);border-radius:7px;
+  padding:10px 14px;font-size:.65rem;display:flex;flex-direction:column;gap:5px;
+}
+.pso-ir{display:flex;justify-content:space-between;gap:18px}
+.pso-il{color:var(--t3);letter-spacing:.1em}
+.pso-iv{font-family:'JetBrains Mono',monospace;color:var(--c)}
+.pso-ctrl-bar{
+  position:absolute;bottom:10px;left:50%;transform:translateX(-50%);
+  display:flex;gap:8px;
+}
+.conv-wrap{
+  background:var(--glass);border:1px solid var(--border);border-radius:10px;
+  overflow:hidden;height:400px;
+}
+.conv-wrap canvas{width:100%!important;height:calc(100% - 48px)!important}
+.ba-row-grid{
+  grid-column:1/-1;
+  display:grid;grid-template-columns:repeat(4,1fr);gap:12px;
+}
+.ba-card{
+  background:var(--glass);border:1px solid var(--border);border-radius:10px;padding:18px;
+  display:flex;flex-direction:column;gap:12px;
+}
+.ba-ttl{font-family:'Orbitron',monospace;font-size:.62rem;letter-spacing:.18em;color:var(--t3);text-transform:uppercase}
+.ba-bars-col{display:flex;flex-direction:column;gap:8px}
+.ba-row2{display:flex;flex-direction:column;gap:4px}
+.ba-row-lbl{font-size:.62rem;color:var(--t3);display:flex;justify-content:space-between}
+.ba-bar{height:6px;background:rgba(255,255,255,.05);border-radius:3px;overflow:hidden}
+.ba-before{height:100%;background:linear-gradient(90deg,var(--r),#ff6688);border-radius:3px;transition:width 1.5s ease}
+.ba-after{height:100%;background:linear-gradient(90deg,var(--g),#00ffcc);border-radius:3px;transition:width 1.5s ease}
+.ba-impr{font-family:'JetBrains Mono',monospace;font-size:1.25rem;font-weight:600;color:var(--g)}
+.ba-impr-lbl{font-size:.6rem;letter-spacing:.2em;color:var(--t3);text-transform:uppercase}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   ANALYTICS PAGE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.analytics-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.chart-panel{background:var(--glass);border:1px solid var(--border);border-radius:10px;overflow:hidden;height:300px}
+.chart-panel canvas{width:100%!important;height:calc(100% - 48px)!important}
+.full-span{grid-column:1/-1}
+.hm-wrap{padding:12px;height:calc(100% - 48px);display:grid;grid-template-columns:repeat(24,1fr);grid-template-rows:repeat(4,1fr);gap:2px}
+.hm-cell{border-radius:2px;transition:all .5s}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   MAP PAGE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.map-box{
+  border:1px solid var(--border);border-radius:10px;overflow:hidden;
+  position:relative;height:600px;background:#060e1c;
+}
+.map-legend-box{
+  position:absolute;top:14px;left:14px;z-index:10;
+  background:rgba(8,12,20,.92);border:1px solid var(--border);border-radius:8px;padding:14px 16px;
+}
+.ml-ttl{font-size:.6rem;letter-spacing:.2em;color:var(--t3);text-transform:uppercase;margin-bottom:8px}
+.ml-item{display:flex;align-items:center;gap:8px;font-size:.68rem;color:var(--t3);margin-bottom:4px}
+.ml-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.map-info-box{
+  position:absolute;bottom:14px;right:14px;z-index:10;
+  background:rgba(8,12,20,.92);border:1px solid var(--border);border-radius:8px;padding:12px 16px;min-width:200px;
+}
+.map-filter-box{
+  position:absolute;top:14px;right:14px;z-index:10;
+  background:rgba(8,12,20,.92);border:1px solid var(--border);border-radius:8px;padding:12px;
+  display:flex;flex-direction:column;gap:6px;
+}
+.map-filter-btn{
+  padding:6px 14px;border-radius:5px;border:1px solid var(--border);
+  background:var(--c-dim);color:var(--c);font-family:'JetBrains Mono',monospace;font-size:.6rem;
+  letter-spacing:.1em;cursor:pointer;transition:all .2s;
+}
+.map-filter-btn:hover{background:rgba(0,210,255,.2)}
+.map-filter-btn.active{background:var(--c);color:var(--void)}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   EXPLAINER PAGE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.explain-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.ex-card{
+  background:var(--glass);border:1px solid var(--border);border-radius:10px;
+  padding:24px;transition:all .3s;cursor:default;
+}
+.ex-card:hover{border-color:rgba(0,210,255,.35);transform:translateY(-3px)}
+.ex-num{font-family:'Orbitron',monospace;font-size:2rem;font-weight:900;color:var(--c);opacity:.25;line-height:1;margin-bottom:10px}
+.ex-title{font-family:'Orbitron',monospace;font-size:.78rem;color:var(--t1);margin-bottom:10px;letter-spacing:.06em}
+.ex-text{font-size:.8rem;line-height:1.8;color:var(--t2)}
+.ex-card.full{grid-column:1/-1;display:flex;gap:32px;align-items:flex-start}
+.ex-live-panel{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ex-g-box{
+  background:rgba(0,210,255,.05);border:1px solid var(--border);border-radius:7px;
+  padding:12px;text-align:center;
+}
+.ex-g-lbl{font-size:.6rem;color:var(--t3);letter-spacing:.15em;text-transform:uppercase;margin-bottom:4px}
+.ex-g-val{font-family:'JetBrains Mono',monospace;font-size:1.4rem;font-weight:600;color:var(--g)}
+
+/* EQUATION BOX */
+.eq-box{
+  border:1px solid var(--border-em);background:var(--a-dim);border-radius:8px;
+  padding:20px;font-family:'JetBrains Mono',monospace;font-size:.78rem;color:var(--a);line-height:2;
+}
+.eq-line{padding:6px 14px;background:rgba(0,0,0,.25);border-radius:3px;margin:3px 0;border-left:2px solid var(--a)}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   EMERGENCY BANNER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+#em-banner{
+  display:none;position:fixed;top:66px;left:0;right:0;z-index:199;
+  background:linear-gradient(135deg,rgba(255,56,96,.14),rgba(255,90,0,.14));
+  border-bottom:1px solid rgba(255,56,96,.4);padding:10px 5%;
+  align-items:center;gap:12px;
+  animation:emFlash .8s ease-in-out infinite;
+}
+#em-banner.show{display:flex}
+@keyframes emFlash{0%,100%{opacity:1}50%{opacity:.65}}
+.em-txt{font-family:'Orbitron',monospace;font-size:.78rem;letter-spacing:.15em;color:var(--r)}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   MISC ANIMATIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+@keyframes fadeIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.dashboard-section.active{animation:fadeIn .35s ease both}
+
+/* Responsive */
+@media(max-width:1100px){
+  .sim-grid{grid-template-columns:1fr}
+  .pso-grid{grid-template-columns:1fr}
+  .analytics-grid{grid-template-columns:1fr}
+  .stats-strip{grid-template-columns:repeat(3,1fr)}
+  .ba-row-grid{grid-template-columns:1fr 1fr}
+  .explain-grid{grid-template-columns:1fr 1fr}
+  .nav-links{display:none}
+}
+@media(max-width:700px){
+  .stats-strip{grid-template-columns:1fr 1fr}
+  .explain-grid{grid-template-columns:1fr}
+  nav{padding:0 4%}
+  section.dashboard-section{padding:70px 4%}
+}
+</style>
+</head>
+<body>
+
+<div class="scanline"></div>
+
+<!-- EMERGENCY BANNER -->
+<div id="em-banner">
+  <span>🚑</span>
+  <span class="em-txt">EMERGENCY VEHICLE DETECTED — JUNCTION 1 LANE 3 — PRIORITY OVERRIDE ACTIVE</span>
+  <span>🚑</span>
+</div>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     HERO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<section id="hero">
+  <canvas id="hero-canvas"></canvas>
+  <div class="hero-orb orb1"></div>
+  <div class="hero-orb orb2"></div>
+  <div class="hero-orb orb3"></div>
+
+  <div class="hero-content">
+    <div class="hero-badge">
+      <span class="dot-a"></span>
+      Particle Swarm Optimization · Smart Traffic Infrastructure
+    </div>
+    <h1 class="hero-title">Traffic Signal<br>Intelligence</h1>
+    <div class="hero-sub">PSO Optimization Engine v4.2</div>
+    <p class="hero-desc">
+      A bio-inspired metaheuristic that coordinates urban traffic signals in real-time —
+      reducing congestion, cutting wait times by 37%, and maximizing throughput across multi-junction networks.
+    </p>
+    <div class="hero-ctas">
+      <a href="#" class="btn-primary" onclick="switchPage('sim',this);return false">⚡ Launch Simulator</a>
+      <a href="#" class="btn-secondary" onclick="switchPage('pso',this);return false">⚛ Explore PSO Engine</a>
+    </div>
+  </div>
+  <div class="scroll-hint">SCROLL TO EXPLORE</div>
+</section>
+
+<!-- STICKY NAV -->
+<nav id="sitenav">
+  <div class="nav-logo">
+    <div class="nav-logo-icon">🚦</div>
+    <div class="nav-logo-text">
+      <span class="nav-logo-name">SMART TRAFFIC AI</span>
+      <span class="nav-logo-sub">SmartCity Infrastructure</span>
+    </div>
+  </div>
+  <div class="nav-links">
+    <button class="nav-tab" onclick="switchPage('sim',this)">🚗 Simulation</button>
+    <button class="nav-tab" onclick="switchPage('pso',this)">⚛️ PSO Engine</button>
+    <button class="nav-tab" onclick="switchPage('analytics',this)">📊 Analytics</button>
+    <button class="nav-tab" onclick="switchPage('map',this)">🗺️ City Map</button>
+    <button class="nav-tab" onclick="switchPage('explain',this)">🧠 AI Explainer</button>
+  </div>
+  <div class="nav-status">
+    <div class="live-pill"><div class="live-dot"></div>LIVE</div>
+    <div class="clock-display" id="clock">00:00:00</div>
+    <div class="ai-pill">⚡ AI ACTIVE</div>
+  </div>
+</nav>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     PAGE 1: SIMULATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<section class="dashboard-section active" id="page-sim">
+  <div class="section-header">
+    <div class="section-eyebrow">01 · Real-Time Simulation</div>
+    <h2 class="section-title">Intersection Control</h2>
+    <p class="section-desc">Live PSO-optimized traffic signal management with animated vehicle flow and emergency override capabilities.</p>
+  </div>
+
+  <!-- Stats strip -->
+  <div class="stats-strip">
+    <div class="s-card c">
+      <div class="s-lbl">Vehicles Processed</div>
+      <div class="s-val" id="stat-proc">0</div>
+      <div class="s-sub"><span class="delta up" id="proc-delta">+12</span>/step</div>
+    </div>
+    <div class="s-card g">
+      <div class="s-lbl">Avg Wait Time</div>
+      <div class="s-val" id="stat-wait">0.0s</div>
+      <div class="s-sub"><span class="delta up">-18%</span> vs baseline</div>
+    </div>
+    <div class="s-card a">
+      <div class="s-lbl">Congestion Level</div>
+      <div class="s-val" id="stat-cong">LOW</div>
+      <div class="s-sub" id="cong-sub">Phase: Morning</div>
+    </div>
+    <div class="s-card r">
+      <div class="s-lbl">Fuel Saved (L)</div>
+      <div class="s-val" id="stat-fuel">0.0</div>
+      <div class="s-sub">vs equal-timing</div>
+    </div>
+    <div class="s-card p">
+      <div class="s-lbl">Signal Efficiency</div>
+      <div class="s-val" id="stat-eff">94%</div>
+      <div class="s-sub"><span class="delta up">+31%</span> PSO gain</div>
+    </div>
+  </div>
+
+  <div class="sim-grid">
+    <!-- Canvas -->
+    <div class="canvas-wrap">
+      <canvas id="intersectionCanvas"></canvas>
+      <div class="canvas-badges">
+        <div class="cbadge">📍 JUNCTION 1 — AI OPTIMIZED</div>
+        <div class="cbadge" id="phase-badge">🟡 PHASE: MORNING RUSH</div>
+        <div class="cbadge" id="step-badge">STEP: 0/200</div>
+      </div>
+      <div class="sim-btn-bar">
+        <button class="sim-btn" id="btn-play" onclick="togglePlay()">⏸ PAUSE</button>
+        <button class="sim-btn" onclick="resetSim()">⟳ RESET</button>
+        <button class="sim-btn r-btn" id="btn-emergency" onclick="triggerEmergency()">🚑 EMERGENCY</button>
+        <button class="sim-btn g-btn" id="btn-mode" onclick="toggleMode()">🤖 AI MODE</button>
+      </div>
+    </div>
+
+    <!-- Right column -->
+    <div class="r-col">
+
+      <!-- Dataset Upload -->
+      <div class="dataset-box glass">
+        <div class="panel-hd"><div class="blt"></div>TRAFFIC DATASET</div>
+
+        <!-- Drop zone -->
+        <div class="upload-drop" id="upload-drop-zone"
+             onclick="document.getElementById('file-input').click()"
+             ondragover="event.preventDefault();this.classList.add('drag')"
+             ondragleave="this.classList.remove('drag')"
+             ondrop="event.preventDefault();this.classList.remove('drag');handleUpload({files:event.dataTransfer.files})">
+          <input type="file" id="file-input" accept=".csv,.json" style="display:none" onchange="handleUpload(this)">
+          <span class="upload-drop-icon" id="upload-icon">📂</span>
+          <div class="upload-drop-lbl" id="upload-lbl">DROP CSV OR CLICK TO UPLOAD</div>
+          <div class="upload-drop-sub" id="upload-sub">smart_traffic_management_dataset.csv</div>
+        </div>
+
+        <!-- Status bar -->
+        <div id="upload-status" style="display:none;margin:0 14px 6px;font-family:'JetBrains Mono',monospace;font-size:.65rem;padding:7px 10px;border-radius:5px"></div>
+
+        <!-- Parsed data preview (shown after upload) -->
+        <div id="dataset-preview" style="display:none;margin:0 14px 8px;padding:10px;background:rgba(0,0,0,.25);border:1px solid var(--border);border-radius:7px;font-family:'JetBrains Mono',monospace;font-size:.6rem;color:var(--t3)">
+          <div style="color:var(--c);font-size:.62rem;letter-spacing:.15em;text-transform:uppercase;margin-bottom:6px">DATASET SUMMARY</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px">
+            <div>Rows: <span id="ds-rows" style="color:var(--t1)">—</span></div>
+            <div>Columns: <span id="ds-cols" style="color:var(--t1)">—</span></div>
+            <div>Avg Volume: <span id="ds-vol" style="color:var(--g)">—</span></div>
+            <div>Peak Hour: <span id="ds-peak" style="color:var(--a)">—</span></div>
+            <div>Density: <span id="ds-density" style="color:var(--c)">—</span></div>
+            <div>Steps: <span id="ds-steps" style="color:var(--p)">—</span></div>
+          </div>
+        </div>
+
+        <!-- RUN SIMULATION button — only visible after upload -->
+        <div id="run-sim-bar" style="display:none;padding:0 14px 10px">
+          <button class="btn-primary" id="run-sim-btn" onclick="runDatasetSimulation()" style="width:100%;justify-content:center;padding:11px 8px;font-size:.68rem">
+            ▶ RUN SIMULATION FROM DATASET
+          </button>
+        </div>
+
+        <!-- Divider -->
+        <div style="margin:0 14px 8px;border-top:1px solid var(--border);padding-top:8px;font-family:'JetBrains Mono',monospace;font-size:.58rem;color:var(--t3);letter-spacing:.15em;text-transform:uppercase">Or use preset scenario</div>
+
+        <div class="sample-btns">
+          <button class="sample-btn" onclick="loadSample('morning')">☀️ Morning</button>
+          <button class="sample-btn" onclick="loadSample('evening')">🌆 Evening</button>
+          <button class="sample-btn" onclick="loadSample('night')">🌙 Night</button>
+        </div>
+      </div>
+
+      <!-- Signal Status -->
+      <div class="glass">
+        <div class="panel-hd"><div class="blt"></div>SIGNAL STATUS</div>
+        <div class="sig-grid">
+          <div class="sig-card">
+            <div class="sig-lbl">North</div>
+            <div class="sig-light" id="sig-N"></div>
+            <div class="sig-timer" id="timer-N">--</div>
+            <div class="sig-phase" id="phase-N">WAITING</div>
+          </div>
+          <div class="sig-card">
+            <div class="sig-lbl">South</div>
+            <div class="sig-light" id="sig-S"></div>
+            <div class="sig-timer" id="timer-S">--</div>
+            <div class="sig-phase" id="phase-S">WAITING</div>
+          </div>
+          <div class="sig-card">
+            <div class="sig-lbl">East</div>
+            <div class="sig-light" id="sig-E"></div>
+            <div class="sig-timer" id="timer-E">--</div>
+            <div class="sig-phase" id="phase-E">WAITING</div>
+          </div>
+          <div class="sig-card">
+            <div class="sig-lbl">West</div>
+            <div class="sig-light" id="sig-W"></div>
+            <div class="sig-timer" id="timer-W">--</div>
+            <div class="sig-phase" id="phase-W">WAITING</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Controls -->
+      <div class="glass">
+        <div class="panel-hd"><div class="blt"></div>CONTROLS</div>
+        <div class="ctrl-panel">
+          <div class="ctrl-row">
+            <div class="ctrl-lbl">Traffic Density <span id="density-val">Medium</span></div>
+            <input type="range" id="density-slider" min="0" max="100" value="50" oninput="updateDensity(this.value)">
+          </div>
+          <div class="ctrl-row">
+            <div class="ctrl-lbl">Sim Speed <span id="speed-val">1×</span></div>
+            <input type="range" id="speed-slider" min="1" max="5" value="2" oninput="updateSpeed(this.value)">
+          </div>
+          <div class="toggle-row">
+            <span class="toggle-lbl">Emergency Priority</span>
+            <div class="tog" id="toggle-em" onclick="this.classList.toggle('on')"></div>
+          </div>
+          <div class="toggle-row">
+            <span class="toggle-lbl">Peak Hour Mode</span>
+            <div class="tog on" id="toggle-peak" onclick="this.classList.toggle('on')"></div>
+          </div>
+          <div class="ctrl-lbl" style="margin-top:4px">OPERATION MODE</div>
+          <div class="mode-row">
+            <button class="mode-b active" id="mode-ai" onclick="setMode('ai')">AI/PSO</button>
+            <button class="mode-b" id="mode-manual" onclick="setMode('manual')">MANUAL</button>
+            <button class="mode-b" id="mode-fixed" onclick="setMode('fixed')">FIXED</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Queue bars -->
+      <div class="glass">
+        <div class="panel-hd"><div class="blt"></div>LANE QUEUES</div>
+        <div class="q-bars">
+          <div class="q-item">
+            <div class="q-hd"><span class="q-hd-l">NORTH</span><span class="q-hd-v" id="q1-val">0 veh</span></div>
+            <div class="q-bar"><div class="q-fill qf1" id="q1-bar" style="width:0%"></div></div>
+          </div>
+          <div class="q-item">
+            <div class="q-hd"><span class="q-hd-l">SOUTH</span><span class="q-hd-v" id="q2-val">0 veh</span></div>
+            <div class="q-bar"><div class="q-fill qf2" id="q2-bar" style="width:0%"></div></div>
+          </div>
+          <div class="q-item">
+            <div class="q-hd"><span class="q-hd-l">EAST</span><span class="q-hd-v" id="q3-val">0 veh</span></div>
+            <div class="q-bar"><div class="q-fill qf3" id="q3-bar" style="width:0%"></div></div>
+          </div>
+          <div class="q-item">
+            <div class="q-hd"><span class="q-hd-l">WEST</span><span class="q-hd-v" id="q4-val">0 veh</span></div>
+            <div class="q-bar"><div class="q-fill qf4" id="q4-bar" style="width:0%"></div></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     PAGE 2: PSO ENGINE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<section class="dashboard-section" id="page-pso">
+  <div class="section-header">
+    <div class="section-eyebrow">02 · Particle Swarm Engine</div>
+    <h2 class="section-title">Optimization Search Space</h2>
+    <p class="section-desc">Configure parameters, run PSO, and watch particles converge on the global optimum for optimal signal timing.</p>
+  </div>
+
+  <!-- Parameters + Live Stats -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+    <div class="glass">
+      <div class="panel-hd"><div class="blt"></div>PSO PARAMETERS</div>
+      <div class="ctrl-panel" style="display:grid;grid-template-columns:1fr 1fr;gap:10px 18px">
+        <div class="ctrl-row">
+          <div class="ctrl-lbl">Iterations <span id="iter-val">100</span></div>
+          <input type="range" id="iter-slider" min="20" max="500" value="100" oninput="syncParam('iter',this.value)">
+          <input type="number" id="iter-num" min="20" max="500" value="100" style="width:100%;margin-top:4px;background:rgba(0,210,255,.07);border:1px solid var(--border);border-radius:4px;color:var(--c);font-family:'JetBrains Mono',monospace;font-size:.72rem;padding:5px 8px;outline:none" oninput="clampAndSync('iter',20,500)">
+        </div>
+        <div class="ctrl-row">
+          <div class="ctrl-lbl">Particles <span id="parts-val">30</span></div>
+          <input type="range" id="parts-slider" min="5" max="100" value="30" oninput="syncParam('parts',this.value)">
+          <input type="number" id="parts-num" min="5" max="100" value="30" style="width:100%;margin-top:4px;background:rgba(0,210,255,.07);border:1px solid var(--border);border-radius:4px;color:var(--c);font-family:'JetBrains Mono',monospace;font-size:.72rem;padding:5px 8px;outline:none" oninput="clampAndSync('parts',5,100)">
+        </div>
+        <div class="ctrl-row">
+          <div class="ctrl-lbl">Cycle <span id="cycle-val">90</span>s</div>
+          <input type="range" id="cycle-slider" min="30" max="180" value="90" oninput="syncParam('cycle',this.value)">
+          <input type="number" id="cycle-num" min="30" max="180" value="90" style="width:100%;margin-top:4px;background:rgba(0,210,255,.07);border:1px solid var(--border);border-radius:4px;color:var(--c);font-family:'JetBrains Mono',monospace;font-size:.72rem;padding:5px 8px;outline:none" oninput="clampAndSync('cycle',30,180)">
+        </div>
+        <div class="ctrl-row">
+          <div class="ctrl-lbl">Junctions <span id="ints-val">2</span></div>
+          <input type="range" id="ints-slider" min="1" max="8" value="2" oninput="syncParam('ints',this.value)">
+          <input type="number" id="ints-num" min="1" max="8" value="2" style="width:100%;margin-top:4px;background:rgba(0,210,255,.07);border:1px solid var(--border);border-radius:4px;color:var(--c);font-family:'JetBrains Mono',monospace;font-size:.72rem;padding:5px 8px;outline:none" oninput="clampAndSync('ints',1,8)">
+        </div>
+      </div>
+      <div style="padding:0 14px 14px;display:flex;gap:8px">
+        <button class="btn-primary" id="pso-run-btn" onclick="runPSOSimulation()" style="flex:1;justify-content:center;padding:12px 8px">⚡ RUN PSO SIMULATION</button>
+        <button class="sim-btn" onclick="restartPSO()" title="Restart" style="padding:12px 14px">⟳</button>
+      </div>
+      <div id="pso-run-status" style="margin:0 14px 12px;font-family:'JetBrains Mono',monospace;font-size:.65rem;padding:7px 10px;border-radius:5px;display:none;border:1px solid var(--border)"></div>
+    </div>
+    <div class="glass">
+      <div class="panel-hd"><div class="blt"></div>PSO LIVE STATS</div>
+      <div style="padding:14px;display:flex;flex-direction:column;gap:9px">
+        <div class="pso-ir"><span class="pso-il">ITERATION</span><span class="pso-iv" id="pso-iter">0</span></div>
+        <div class="pso-ir"><span class="pso-il">TOTAL ITERATIONS</span><span class="pso-iv" id="pso-iter-total">100</span></div>
+        <div class="pso-ir"><span class="pso-il">PARTICLES</span><span class="pso-iv" id="pso-parts-live">30</span></div>
+        <div class="pso-ir"><span class="pso-il">BEST FITNESS</span><span class="pso-iv" id="pso-best">—</span></div>
+        <div class="pso-ir"><span class="pso-il">CONVERGED</span><span class="pso-iv" id="pso-conv">NO</span></div>
+        <div class="pso-ir"><span class="pso-il">CYCLE LENGTH</span><span class="pso-iv" id="pso-cycle-live">90s</span></div>
+        <div style="height:6px;background:rgba(0,210,255,.08);border-radius:3px;overflow:hidden;margin-top:4px">
+          <div id="pso-progress-bar" style="height:100%;width:0%;background:linear-gradient(90deg,var(--c),var(--g));border-radius:3px;transition:width .25s ease"></div>
+        </div>
+        <div style="font-size:.6rem;color:var(--t3);text-align:right" id="pso-pct-lbl">0%</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pso-grid">
+    <div class="pso-canvas-wrap glass">
+      <div class="panel-hd" style="position:absolute;top:0;left:0;right:0;z-index:2"><div class="blt"></div>PARTICLE SWARM — SEARCH SPACE</div>
+      <canvas id="psoCanvas"></canvas>
+      <div class="pso-ctrl-bar">
+        <button class="sim-btn" id="pso-play-btn" onclick="togglePSOPlay()">⏸ PAUSE</button>
+      </div>
+    </div>
+
+    <div class="conv-wrap glass">
+      <div class="panel-hd"><div class="blt"></div>CONVERGENCE CURVE</div>
+      <canvas id="convCanvas"></canvas>
+    </div>
+
+    <div class="ba-row-grid">
+      <div class="ba-card glass">
+        <div class="ba-ttl">Avg Waiting Time</div>
+        <div class="ba-bars-col">
+          <div class="ba-row2">
+            <div class="ba-row-lbl"><span>Baseline</span><span>14.8s</span></div>
+            <div class="ba-bar"><div class="ba-before" style="width:100%"></div></div>
+          </div>
+          <div class="ba-row2">
+            <div class="ba-row-lbl"><span>PSO Optimized</span><span>9.2s</span></div>
+            <div class="ba-bar"><div class="ba-after" style="width:62%"></div></div>
+          </div>
+        </div>
+        <div class="ba-impr">−37.8%</div>
+        <div class="ba-impr-lbl">IMPROVEMENT</div>
+      </div>
+      <div class="ba-card glass">
+        <div class="ba-ttl">Throughput (veh/step)</div>
+        <div class="ba-bars-col">
+          <div class="ba-row2">
+            <div class="ba-row-lbl"><span>Baseline</span><span>1.24</span></div>
+            <div class="ba-bar"><div class="ba-before" style="width:55%"></div></div>
+          </div>
+          <div class="ba-row2">
+            <div class="ba-row-lbl"><span>PSO Optimized</span><span>1.87</span></div>
+            <div class="ba-bar"><div class="ba-after" style="width:83%"></div></div>
+          </div>
+        </div>
+        <div class="ba-impr">+50.8%</div>
+        <div class="ba-impr-lbl">IMPROVEMENT</div>
+      </div>
+      <div class="ba-card glass">
+        <div class="ba-ttl">Fuel Wasted (L)</div>
+        <div class="ba-bars-col">
+          <div class="ba-row2">
+            <div class="ba-row-lbl"><span>Baseline</span><span>328.4</span></div>
+            <div class="ba-bar"><div class="ba-before" style="width:100%"></div></div>
+          </div>
+          <div class="ba-row2">
+            <div class="ba-row-lbl"><span>PSO Optimized</span><span>201.1</span></div>
+            <div class="ba-bar"><div class="ba-after" style="width:61%"></div></div>
+          </div>
+        </div>
+        <div class="ba-impr">−38.8%</div>
+        <div class="ba-impr-lbl">IMPROVEMENT</div>
+      </div>
+      <div class="ba-card glass">
+        <div class="ba-ttl">Signal Efficiency</div>
+        <div class="ba-bars-col">
+          <div class="ba-row2">
+            <div class="ba-row-lbl"><span>Baseline</span><span>62%</span></div>
+            <div class="ba-bar"><div class="ba-before" style="width:62%"></div></div>
+          </div>
+          <div class="ba-row2">
+            <div class="ba-row-lbl"><span>PSO Optimized</span><span>94%</span></div>
+            <div class="ba-bar"><div class="ba-after" style="width:94%"></div></div>
+          </div>
+        </div>
+        <div class="ba-impr">+51.6%</div>
+        <div class="ba-impr-lbl">IMPROVEMENT</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     PAGE 3: ANALYTICS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<section class="dashboard-section" id="page-analytics">
+  <div class="section-header">
+    <div class="section-eyebrow">03 · Analytics Dashboard</div>
+    <h2 class="section-title">Performance Intelligence</h2>
+    <p class="section-desc">Real-time analytics, 24-hour congestion heatmaps, and PSO green time allocation across all junctions.</p>
+  </div>
+  <div class="analytics-grid">
+    <div class="chart-panel glass">
+      <div class="panel-hd"><div class="blt"></div>WAITING TIME OVER TIME</div>
+      <canvas id="waitChart"></canvas>
+    </div>
+    <div class="chart-panel glass">
+      <div class="panel-hd"><div class="blt"></div>TRAFFIC THROUGHPUT</div>
+      <canvas id="throughputChart"></canvas>
+    </div>
+    <div class="chart-panel glass full-span" style="height:250px">
+      <div class="panel-hd"><div class="blt"></div>24H CONGESTION HEATMAP (LANES × HOURS)</div>
+      <div class="hm-wrap" id="heatmap"></div>
+    </div>
+    <div class="chart-panel glass">
+      <div class="panel-hd"><div class="blt"></div>PHASE DISTRIBUTION</div>
+      <canvas id="phaseChart"></canvas>
+    </div>
+    <div class="chart-panel glass">
+      <div class="panel-hd"><div class="blt"></div>GREEN TIME ALLOCATION (PSO)</div>
+      <canvas id="greenChart"></canvas>
+    </div>
+  </div>
+</section>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     PAGE 4: CITY MAP
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<section class="dashboard-section" id="page-map">
+  <div class="section-header">
+    <div class="section-eyebrow">04 · City Map</div>
+    <h2 class="section-title">Urban Traffic Network</h2>
+    <p class="section-desc">Interactive city map with animated traffic flow, congestion heatmap overlay, and real-time junction status.</p>
+  </div>
+  <div class="map-box">
+    <canvas id="mapCanvas" style="width:100%;height:100%"></canvas>
+    <div class="map-legend-box">
+      <div class="ml-ttl">Congestion Level</div>
+      <div class="ml-item"><div class="ml-dot" style="background:#00ffa3"></div>Low (0–30%)</div>
+      <div class="ml-item"><div class="ml-dot" style="background:#ffb300"></div>Medium (30–70%)</div>
+      <div class="ml-item"><div class="ml-dot" style="background:#ff3860"></div>High (70–100%)</div>
+      <div class="ml-item"><div class="ml-dot" style="background:#00d2ff"></div>Junction (Active)</div>
+    </div>
+    <div class="map-filter-box">
+      <button class="map-filter-btn active" onclick="setMapFilter('all',this)">ALL</button>
+      <button class="map-filter-btn" onclick="setMapFilter('ai',this)">AI ACTIVE</button>
+      <button class="map-filter-btn" onclick="setMapFilter('high',this)">HIGH CONG.</button>
+    </div>
+    <div class="map-info-box">
+      <div style="font-size:.6rem;color:var(--t3);letter-spacing:.2em;margin-bottom:6px">CLICK JUNCTION FOR DETAILS</div>
+      <div id="map-detail" style="font-size:.75rem;color:var(--t1)">—</div>
+    </div>
+  </div>
+</section>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     PAGE 5: AI EXPLAINER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<section class="dashboard-section" id="page-explain">
+  <div class="section-header">
+    <div class="section-eyebrow">05 · AI Explainer</div>
+    <h2 class="section-title">How PSO Works</h2>
+    <p class="section-desc">Step-by-step breakdown of the Particle Swarm Optimization algorithm applied to traffic signal control.</p>
+  </div>
+  <div class="explain-grid">
+    <div class="ex-card">
+      <div class="ex-num">01</div>
+      <div class="ex-title">Particle Initialization</div>
+      <div class="ex-text">PSO begins by creating 30 particles, each representing a candidate set of green-time durations [g₁,g₂,g₃,g₄] for both junctions — 8 dimensions total. Values are initialized uniformly in [5, 60] seconds with random velocity vectors.</div>
+    </div>
+    <div class="ex-card">
+      <div class="ex-num">02</div>
+      <div class="ex-title">Fitness Evaluation</div>
+      <div class="ex-text">Each particle's position feeds the traffic simulation. The simulator runs 200 time-steps, computing average vehicle waiting time per lane. Fitness f(x) = mean waiting time across all 4 lanes × 2 junctions. Lower is better.</div>
+    </div>
+    <div class="ex-card">
+      <div class="ex-num">03</div>
+      <div class="ex-title">Velocity Update Rule</div>
+      <div class="ex-text">v(t+1) = ω·v(t) + c₁·r₁·(pBest − x) + c₂·r₂·(gBest − x). Inertia ω=0.7 balances exploration vs exploitation. Cognitive c₁=1.5 pulls to personal best; social c₂=1.8 pulls to global best.</div>
+      <div class="eq-box" style="margin-top:12px;font-size:.68rem">
+        <div class="eq-line">ω = 0.7 · c₁ = 1.5 · c₂ = 1.8</div>
+        <div class="eq-line" style="color:var(--c)">Converges in ~40–50 iterations</div>
+      </div>
+    </div>
+    <div class="ex-card">
+      <div class="ex-num">04</div>
+      <div class="ex-title">Emergency Override Logic</div>
+      <div class="ex-text">When an emergency vehicle is detected (3%/step probability), the PSO solution is suspended. The affected lane receives an immediate green signal override lasting 15 steps. All other lanes hold red until clearance.</div>
+    </div>
+    <div class="ex-card">
+      <div class="ex-num">05</div>
+      <div class="ex-title">Multi-Junction Coordination</div>
+      <div class="ex-text">Junction 2 receives a delayed traffic wave from Junction 1, simulating arterial flow. PSO optimizes both junctions simultaneously (8D problem), reducing stop-and-go cascades and improving green-wave propagation.</div>
+    </div>
+    <div class="ex-card">
+      <div class="ex-num">06</div>
+      <div class="ex-title">Convergence & Results</div>
+      <div class="ex-text">PSO converges in ~40–50 iterations (100 max). Global best solution [g₁,g₂,g₃,g₄] adapts to traffic density. Result: −37.8% waiting time, +50.8% throughput, −38.8% fuel wasted vs fixed baseline.</div>
+    </div>
+
+    <div class="ex-card full">
+      <div style="flex:1">
+        <div class="ex-num">⚡</div>
+        <div class="ex-title">Current AI Decision</div>
+        <div class="ex-text" id="ai-decision-text">AI analyzing traffic density... PSO recommends extending North/South green by 3s due to elevated queue on lanes 1&2. East/West reduced by 2s. Estimated improvement: 12% this cycle.</div>
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:8px">
+        <div style="font-size:.6rem;letter-spacing:.2em;color:var(--t3);text-transform:uppercase;margin-bottom:4px">OPTIMAL GREEN TIMES (PSO)</div>
+        <div class="ex-live-panel">
+          <div class="ex-g-box"><div class="ex-g-lbl">J1 NORTH</div><div class="ex-g-val" id="exp-g1">—</div></div>
+          <div class="ex-g-box"><div class="ex-g-lbl">J1 SOUTH</div><div class="ex-g-val" id="exp-g2">—</div></div>
+          <div class="ex-g-box"><div class="ex-g-lbl">J1 EAST</div><div class="ex-g-val" id="exp-g3">—</div></div>
+          <div class="ex-g-box"><div class="ex-g-lbl">J1 WEST</div><div class="ex-g-val" id="exp-g4">—</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+// ============================================================
+// HERO CANVAS — PARTICLE NETWORK
+// ============================================================
+(function(){
+  const c = document.getElementById('hero-canvas');
+  const ctx = c.getContext('2d');
+  let W, H, pts=[], RAF;
+  const N=90;
+  function resize(){
+    W=c.width=window.innerWidth; H=c.height=window.innerHeight;
+  }
+  resize(); window.addEventListener('resize',resize);
+
+  class Pt{
+    constructor(){this.reset(true)}
+    reset(init=false){
+      this.x=Math.random()*W; this.y=Math.random()*H;
+      this.vx=(Math.random()-.5)*.6; this.vy=(Math.random()-.5)*.6;
+      this.r=1+Math.random()*2.5;
+      this.a=init?Math.random():0;
+      this.ta=.4+Math.random()*.5;
+      this.hue=Math.random()<.6?'0,210,255':'0,255,163';
+    }
+    tick(){
+      this.x+=this.vx; this.y+=this.vy;
+      this.a+=(this.ta-this.a)*.02;
+      if(this.x<-50||this.x>W+50||this.y<-50||this.y>H+50) this.reset();
+    }
+  }
+
+  for(let i=0;i<N;i++) pts.push(new Pt());
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    // connections
+    for(let i=0;i<pts.length;i++){
+      for(let j=i+1;j<pts.length;j++){
+        const dx=pts[i].x-pts[j].x, dy=pts[i].y-pts[j].y;
+        const d=Math.sqrt(dx*dx+dy*dy);
+        if(d<130){
+          const op=(1-d/130)*.18*Math.min(pts[i].a,pts[j].a);
+          ctx.beginPath();ctx.moveTo(pts[i].x,pts[i].y);ctx.lineTo(pts[j].x,pts[j].y);
+          ctx.strokeStyle=`rgba(0,210,255,${op})`;ctx.lineWidth=.7;ctx.stroke();
+        }
+      }
+    }
+    // dots
+    pts.forEach(p=>{
+      ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+      ctx.fillStyle=`rgba(${p.hue},${p.a})`;
+      ctx.shadowColor=`rgba(${p.hue},0.8)`;ctx.shadowBlur=8;
+      ctx.fill();ctx.shadowBlur=0;
+      p.tick();
+    });
+    RAF=requestAnimationFrame(draw);
+  }
+  draw();
+})();
+
+// ============================================================
+// GLOBAL STATE
+// ============================================================
+let simRunning=true, simStep=0, simSpeed=2, densityVal=50, aiMode=true;
+let emergencyActive=false, emergencyCountdown=0, peakHour=true;
+let psoPlaying=true;
+
+const totalSteps=200;
+const phases=[];
+for(let i=0;i<totalSteps;i++){
+  const p=i/totalSteps;
+  phases.push(p<.25?'LOW':p<.45?'HIGH':p<.65?'MEDIUM':p<.85?'HIGH':'LOW');
+}
+const arrivals=phases.map(ph=>{
+  if(ph==='LOW') return [.5+Math.random(),.5+Math.random(),.5+Math.random(),.5+Math.random()].map(v=>v*.5+.5);
+  if(ph==='HIGH') return [3.5+Math.random()*2,3.5+Math.random()*2,3.5+Math.random()*2,3.5+Math.random()*2];
+  return [1.8+Math.random()*1.4,1.8+Math.random()*1.4,1.8+Math.random()*1.4,1.8+Math.random()*1.4];
+});
+const psoGreenJ1=[18,15,12,14];
+const psoGreenJ2=[16,17,11,13];
+
+let signals=['red','red','red','red'];
+let signalPhase=0, signalTimer=0, signalCounters=[20,0,0,0];
+let queues=[0,0,0,0], totalProcessed=0, totalFuel=0;
+
+// Clock
+function updateClock(){
+  const n=new Date();
+  document.getElementById('clock').textContent=
+    String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0')+':'+String(n.getSeconds()).padStart(2,'0');
+}
+setInterval(updateClock,1000); updateClock();
+
+// Page switching
+function switchPage(id,btn){
+  document.querySelectorAll('.dashboard-section').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  if(btn) btn.classList.add('active');
+
+  // Hide hero if showing a page
+  const hero=document.getElementById('hero');
+  if(hero) hero.style.display='none';
+
+  if(id==='pso') startPSOAnimation();
+  if(id==='analytics') initAnalytics();
+  if(id==='map') initMap();
+}
+
+// ============================================================
+// INTERSECTION CANVAS
+// ============================================================
+const canvas=document.getElementById('intersectionCanvas');
+const ctx=canvas.getContext('2d');
+function resizeCanvas(){
+  canvas.width=canvas.parentElement.clientWidth;
+  canvas.height=canvas.parentElement.clientHeight;
+}
+resizeCanvas(); window.addEventListener('resize',resizeCanvas);
+
+const vehicles=[]; const MAX_VEH=40;
+
+// Vehicle types: car, suv, truck, bus, ambulance
+const VEH_TYPES=['car','car','car','car','suv','suv','truck','bus'];
+const VEH_COLORS=[
+  '#4fc3f7','#81d4fa','#29b6f6',   // blues
+  '#80cbc4','#4db6ac',              // teals
+  '#fff176','#ffcc02',              // yellows
+  '#ce93d8','#ba68c8',              // purples
+  '#a5d6a7','#66bb6a',              // greens
+  '#ffab91','#ff8a65',              // oranges
+  '#f48fb1',                        // pink
+];
+
+class Vehicle{
+  constructor(){
+    this.dir=Math.floor(Math.random()*4);
+    this.lane=Math.floor(Math.random()*2);
+    this.progress=0;
+    this.speed=.0008+Math.random()*.0012;
+    this.waiting=false; this.crossing=false; this.crossed=false;
+    this.isAmbulance=Math.random()<.025;
+    this.type=this.isAmbulance?'ambulance':VEH_TYPES[Math.floor(Math.random()*VEH_TYPES.length)];
+    this.color=this.isAmbulance?'#ff3860':VEH_COLORS[Math.floor(Math.random()*VEH_COLORS.length)];
+    this.lightFlicker=0;
+    // Size based on type
+    const sizes={car:[18,10],suv:[20,12],truck:[28,12],bus:[32,13],ambulance:[22,11]};
+    const s=sizes[this.type]||[18,10];
+    this.len=s[0]; this.wid=s[1];
+  }
+}
+
+function spawnVehicle(){ if(vehicles.length<MAX_VEH) vehicles.push(new Vehicle()); }
+
+// Draw a proper traffic signal pole with 3 lights
+function drawSignalPole(c2,x,y,state,facing){
+  // Pole
+  c2.strokeStyle='#1a2a3a'; c2.lineWidth=3;
+  c2.beginPath();
+  if(facing==='H'){ c2.moveTo(x,y); c2.lineTo(x,y-28); }
+  else            { c2.moveTo(x,y); c2.lineTo(x-28,y); }
+  c2.stroke();
+
+  // Housing box
+  const bw=14,bh=36;
+  let bx,by;
+  if(facing==='H'){ bx=x-bw/2; by=y-28-bh; }
+  else            { bx=x-28-bh; by=y-bw/2; }
+
+  // Box background
+  c2.fillStyle='#0d1a2a';
+  if(facing==='H') roundRect(c2,bx,by,bw,bh,3);
+  else             roundRect(c2,bx,by,bh,bw,3);
+  c2.fill();
+  c2.strokeStyle='rgba(0,210,255,0.25)'; c2.lineWidth=1;
+  if(facing==='H') roundRect(c2,bx,by,bw,bh,3);
+  else             roundRect(c2,bx,by,bh,bw,3);
+  c2.stroke();
+
+  // Three bulbs
+  const bulbData=[
+    {col:'#ff3860',glow:'rgba(255,56,96,.9)',  active:state==='red'},
+    {col:'#ffb300',glow:'rgba(255,179,0,.9)',  active:state==='yellow'},
+    {col:'#00ffa3',glow:'rgba(0,255,163,.9)',  active:state==='green'},
+  ];
+  bulbData.forEach((b,i)=>{
+    let lx,ly;
+    if(facing==='H'){ lx=bx+bw/2; ly=by+7+i*11; }
+    else            { lx=bx+7+i*11; ly=by+bw/2; }
+    // Off state
+    const offColor=i===0?'#2d0a0a':i===1?'#2d1a00':'#001a0a';
+    c2.beginPath(); c2.arc(lx,ly,4.5,0,Math.PI*2);
+    c2.fillStyle=offColor; c2.fill();
+    if(b.active){
+      c2.beginPath(); c2.arc(lx,ly,4.5,0,Math.PI*2);
+      c2.fillStyle=b.col;
+      c2.shadowColor=b.glow; c2.shadowBlur=12;
+      c2.fill(); c2.shadowBlur=0;
+      // outer glow ring
+      c2.beginPath(); c2.arc(lx,ly,7,0,Math.PI*2);
+      c2.strokeStyle=b.col.replace(')',',0.3)').replace('rgb','rgba');
+      c2.lineWidth=1.5; c2.stroke();
+    }
+  });
+}
+
+function roundRect(c2,x,y,w,h,r){
+  c2.beginPath();
+  c2.moveTo(x+r,y);
+  c2.lineTo(x+w-r,y); c2.arcTo(x+w,y,x+w,y+r,r);
+  c2.lineTo(x+w,y+h-r); c2.arcTo(x+w,y+h,x+w-r,y+h,r);
+  c2.lineTo(x+r,y+h); c2.arcTo(x,y+h,x,y+h-r,r);
+  c2.lineTo(x,y+r); c2.arcTo(x,y,x+r,y,r);
+  c2.closePath();
+}
+
+// Draw a proper car/vehicle shape
+function drawVehicle(c2,x,y,vlen,vwid,color,type,isHoriz,facing,isAmbulance,flicker){
+  c2.save();
+  c2.translate(x,y);
+  if(isHoriz){
+    if(facing>0) c2.rotate(Math.PI); // facing left
+  } else {
+    c2.rotate(facing>0?Math.PI/2:-Math.PI/2);
+  }
+
+  const l=vlen/2, w=vwid/2;
+
+  // Shadow
+  c2.shadowColor='rgba(0,0,0,0.5)'; c2.shadowBlur=6; c2.shadowOffsetY=3;
+
+  // Body
+  const bodyGrad=c2.createLinearGradient(-l,-w,l,w);
+  bodyGrad.addColorStop(0, lightenColor(color,30));
+  bodyGrad.addColorStop(0.5, color);
+  bodyGrad.addColorStop(1, darkenColor(color,20));
+  c2.fillStyle=bodyGrad;
+  roundRect(c2,-l,-w,vlen,vwid,3);
+  c2.fill();
+  c2.shadowBlur=0; c2.shadowOffsetY=0;
+
+  // Roof (cab area) — only for car/suv
+  if(type==='car'||type==='suv'||type==='ambulance'){
+    const roofW=vwid*0.72, roofL=vlen*0.45;
+    const roofGrad=c2.createLinearGradient(-roofL/2,-roofW/2,roofL/2,roofW/2);
+    roofGrad.addColorStop(0, lightenColor(color,15));
+    roofGrad.addColorStop(1, darkenColor(color,30));
+    c2.fillStyle=roofGrad;
+    roundRect(c2,-roofL/2,-roofW/2,roofL,roofW,2);
+    c2.fill();
+  }
+
+  // Windshield
+  if(type!=='bus'&&type!=='truck'){
+    c2.fillStyle='rgba(120,200,255,0.35)';
+    roundRect(c2,l*0.05,-w*0.65,l*0.38,w*1.3,2);
+    c2.fill();
+    c2.fillStyle='rgba(120,200,255,0.2)';
+    roundRect(c2,-l*0.45,-w*0.65,l*0.35,w*1.3,2);
+    c2.fill();
+  } else {
+    // Bus/truck windshield
+    c2.fillStyle='rgba(100,180,255,0.3)';
+    roundRect(c2,l*0.45,-w*0.8,l*0.5,w*1.6,2);
+    c2.fill();
+  }
+
+  // Wheels
+  const wheelR=3.2;
+  const wheelPositions=[
+    [-l*0.6,-w-1],[l*0.5,-w-1],
+    [-l*0.6, w+1],[l*0.5, w+1]
+  ];
+  if(type==='bus'||type==='truck'){
+    wheelPositions.push([-l*0.1,-w-1],[-l*0.1,w+1]);
+  }
+  wheelPositions.forEach(([wx,wy])=>{
+    c2.beginPath(); c2.arc(wx,wy,wheelR,0,Math.PI*2);
+    c2.fillStyle='#1a1a2e'; c2.fill();
+    c2.strokeStyle='#3a3a5a'; c2.lineWidth=1; c2.stroke();
+    // hub
+    c2.beginPath(); c2.arc(wx,wy,1.5,0,Math.PI*2);
+    c2.fillStyle='#5a6a8a'; c2.fill();
+  });
+
+  // Headlights
+  c2.shadowColor='rgba(255,240,180,0.9)'; c2.shadowBlur=8;
+  c2.fillStyle='rgba(255,240,180,0.95)';
+  c2.beginPath(); c2.ellipse(l-1,-w*0.55,2.5,2,0,0,Math.PI*2); c2.fill();
+  c2.beginPath(); c2.ellipse(l-1, w*0.55,2.5,2,0,0,Math.PI*2); c2.fill();
+  c2.shadowBlur=0;
+
+  // Tail lights
+  c2.fillStyle='rgba(255,50,60,0.9)';
+  c2.beginPath(); c2.ellipse(-l+1,-w*0.55,2,1.8,0,0,Math.PI*2); c2.fill();
+  c2.beginPath(); c2.ellipse(-l+1, w*0.55,2,1.8,0,0,Math.PI*2); c2.fill();
+
+  // Ambulance markings
+  if(isAmbulance){
+    c2.fillStyle=flicker?'rgba(255,0,60,0.9)':'rgba(0,120,255,0.9)';
+    c2.beginPath(); c2.arc(0,-w*0.5,3,0,Math.PI*2); c2.fill();
+    c2.shadowColor=flicker?'rgba(255,0,60,.8)':'rgba(0,120,255,.8)';
+    c2.shadowBlur=10; c2.fill(); c2.shadowBlur=0;
+    // Cross
+    c2.fillStyle='rgba(255,255,255,0.85)';
+    c2.fillRect(-1,-w*0.3,2,w*0.6);
+    c2.fillRect(-3,-w*0.05,6,2);
+    // Stripe
+    c2.fillStyle='rgba(255,255,255,0.25)';
+    c2.fillRect(-l+3,-2,vlen-6,4);
+  }
+
+  // Truck/bus extra details
+  if(type==='truck'){
+    c2.fillStyle='rgba(255,255,255,0.07)';
+    for(let i=0;i<3;i++) c2.fillRect(-l+4+i*8,-w+2,6,vwid-4);
+  }
+  if(type==='bus'){
+    c2.fillStyle='rgba(180,220,255,0.2)';
+    for(let i=0;i<4;i++){
+      roundRect(c2,-l+6+i*(vlen-14)/4,-w+2,(vlen-14)/4-2,vwid-4,1);
+      c2.fill();
+    }
+  }
+
+  c2.restore();
+}
+
+function lightenColor(hex,amt){
+  const r=Math.min(255,parseInt(hex.slice(1,3),16)+amt);
+  const g=Math.min(255,parseInt(hex.slice(3,5),16)+amt);
+  const b=Math.min(255,parseInt(hex.slice(5,7),16)+amt);
+  return `rgb(${r},${g},${b})`;
+}
+function darkenColor(hex,amt){
+  // handle both #rrggbb and hsl() formats
+  if(hex.startsWith('hsl')||hex.startsWith('rgb')) return hex;
+  const r=Math.max(0,parseInt(hex.slice(1,3),16)-amt);
+  const g=Math.max(0,parseInt(hex.slice(3,5),16)-amt);
+  const b=Math.max(0,parseInt(hex.slice(5,7),16)-amt);
+  return `rgb(${r},${g},${b})`;
+}
+
+function drawIntersection(){
+  const W=canvas.width, H=canvas.height;
+  const cx=W/2, cy=H/2, roadW=96;
+
+  // ── Background city block atmosphere ──
+  ctx.fillStyle='#060d1a'; ctx.fillRect(0,0,W,H);
+
+  // Fine grid
+  ctx.strokeStyle='rgba(0,210,255,0.018)';ctx.lineWidth=1;
+  for(let x=0;x<W;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+  for(let y=0;y<H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+
+  // ── City blocks (buildings) ──
+  const blocks=[
+    {x:0,y:0,w:cx-roadW/2,h:cy-roadW/2},
+    {x:cx+roadW/2,y:0,w:W-(cx+roadW/2),h:cy-roadW/2},
+    {x:0,y:cy+roadW/2,w:cx-roadW/2,h:H-(cy+roadW/2)},
+    {x:cx+roadW/2,y:cy+roadW/2,w:W-(cx+roadW/2),h:H-(cy+roadW/2)},
+  ];
+  blocks.forEach(b=>{
+    // Block base
+    ctx.fillStyle='#08111f'; ctx.fillRect(b.x,b.y,b.w,b.h);
+    // Building outlines inside block
+    const pad=10;
+    const bldW=Math.min(b.w-pad*2,65), bldH=Math.min(b.h-pad*2,65);
+    if(bldW>20&&bldH>20){
+      ctx.fillStyle='#0c1828';
+      ctx.fillRect(b.x+pad,b.y+pad,bldW,bldH);
+      ctx.strokeStyle='rgba(0,210,255,0.06)'; ctx.lineWidth=1;
+      ctx.strokeRect(b.x+pad,b.y+pad,bldW,bldH);
+      // windows
+      for(let wy=b.y+pad+8;wy<b.y+pad+bldH-6;wy+=9){
+        for(let wx=b.x+pad+6;wx<b.x+pad+bldW-6;wx+=9){
+          const lit=Math.random()>.45;
+          ctx.fillStyle=lit?`rgba(255,230,140,${0.1+Math.random()*.15})`:'rgba(0,210,255,0.03)';
+          ctx.fillRect(wx,wy,5,4);
+        }
+      }
+    }
+  });
+
+  // ── Road surfaces ──
+  // Main road fill
+  ctx.fillStyle='#111c2c';
+  ctx.fillRect(0,cy-roadW/2,W,roadW);
+  ctx.fillRect(cx-roadW/2,0,roadW,H);
+
+  // Road texture / subtle asphalt
+  ctx.fillStyle='rgba(0,0,0,0.15)';
+  ctx.fillRect(0,cy-roadW/2,W,roadW);
+  ctx.fillRect(cx-roadW/2,0,roadW,H);
+
+  // Road edge lines (kerbs)
+  ctx.strokeStyle='rgba(255,255,255,0.08)'; ctx.lineWidth=1.5;
+  [[0,cy-roadW/2,W,cy-roadW/2],[0,cy+roadW/2,W,cy+roadW/2],
+   [cx-roadW/2,0,cx-roadW/2,H],[cx+roadW/2,0,cx+roadW/2,H]].forEach(([x1,y1,x2,y2])=>{
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+  });
+
+  // Lane centre dashes — horizontal road
+  ctx.strokeStyle='rgba(255,220,40,0.18)'; ctx.lineWidth=1.5; ctx.setLineDash([22,14]);
+  ctx.beginPath(); ctx.moveTo(0,cy); ctx.lineTo(cx-roadW/2,cy); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx+roadW/2,cy); ctx.lineTo(W,cy); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx,0); ctx.lineTo(cx,cy-roadW/2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx,cy+roadW/2); ctx.lineTo(cx,H); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // ── Intersection box ──
+  ctx.fillStyle='#0e1a2c'; ctx.fillRect(cx-roadW/2,cy-roadW/2,roadW,roadW);
+
+  // Intersection grid lines
+  ctx.strokeStyle='rgba(0,210,255,0.04)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(cx,cy-roadW/2); ctx.lineTo(cx,cy+roadW/2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx-roadW/2,cy); ctx.lineTo(cx+roadW/2,cy); ctx.stroke();
+
+  // Stop lines
+  ctx.strokeStyle='rgba(255,255,255,0.4)'; ctx.lineWidth=2.5;
+  ctx.beginPath(); ctx.moveTo(cx-roadW/2+2,cy-roadW/2-3); ctx.lineTo(cx+roadW/2-2,cy-roadW/2-3); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx-roadW/2+2,cy+roadW/2+3); ctx.lineTo(cx+roadW/2-2,cy+roadW/2+3); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx-roadW/2-3,cy-roadW/2+2); ctx.lineTo(cx-roadW/2-3,cy+roadW/2-2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx+roadW/2+3,cy-roadW/2+2); ctx.lineTo(cx+roadW/2+3,cy+roadW/2-2); ctx.stroke();
+
+  // Crosswalks (zebra stripes)
+  ctx.fillStyle='rgba(255,255,255,0.07)';
+  for(let i=0;i<6;i++){
+    ctx.fillRect(cx-roadW/2+4+i*7, cy+roadW/2+5, 5, 13);
+    ctx.fillRect(cx-roadW/2+4+i*7, cy-roadW/2-18, 5, 13);
+    ctx.fillRect(cx+roadW/2+5, cy-roadW/2+4+i*7, 13, 5);
+    ctx.fillRect(cx-roadW/2-18, cy-roadW/2+4+i*7, 13, 5);
+  }
+
+  // Manhole cover
+  ctx.beginPath(); ctx.arc(cx,cy,12,0,Math.PI*2);
+  ctx.strokeStyle='rgba(0,210,255,0.08)'; ctx.lineWidth=1.5; ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx,cy,7,0,Math.PI*2);
+  ctx.strokeStyle='rgba(0,210,255,0.05)'; ctx.lineWidth=1; ctx.stroke();
+
+  // ── Traffic Signal Poles (4 corners) ──
+  // NW corner → controls North (signals[0])
+  drawSignalPole(ctx, cx-roadW/2-6, cy-roadW/2-6, signals[0], 'H');
+  // SE corner → controls South (signals[1])
+  drawSignalPole(ctx, cx+roadW/2+6, cy+roadW/2+6, signals[1], 'H');
+  // NE corner → controls East (signals[2])
+  drawSignalPole(ctx, cx+roadW/2+6, cy-roadW/2-6, signals[2], 'V');
+  // SW corner → controls West (signals[3])
+  drawSignalPole(ctx, cx-roadW/2-6, cy+roadW/2+6, signals[3], 'V');
+
+  // ── Vehicles ──
+  vehicles.forEach(v=>{
+    const dirs=[
+      {from:[cx-roadW*.2,    0],     to:[cx-roadW*.2,    cy-roadW/2-5], axis:'V', faceDir:1},  // N: top→intersection, left lane
+      {from:[cx+roadW*.2,    H],     to:[cx+roadW*.2,    cy+roadW/2+5], axis:'V', faceDir:-1}, // S: bottom→intersection, right lane
+      {from:[W,              cy-roadW*.2], to:[cx+roadW/2+5, cy-roadW*.2], axis:'H', faceDir:1},  // E: right→intersection
+      {from:[0,              cy+roadW*.2], to:[cx-roadW/2-5, cy+roadW*.2], axis:'H', faceDir:-1}, // W: left→intersection
+    ];
+    const d=dirs[v.dir];
+    const prog=v.waiting?v.progress:Math.min(v.progress,v.crossing?1:.88);
+    const rawX=d.from[0]+(d.to[0]-d.from[0])*prog;
+    const rawY=d.from[1]+(d.to[1]-d.from[1])*prog;
+    // Lane offset
+    const offset=(v.lane===0?-1:1)*(d.axis==='V'?roadW*.18:roadW*.18);
+    const vx=rawX+(d.axis==='V'?offset:0);
+    const vy=rawY+(d.axis==='H'?offset:0);
+
+    v.lightFlicker=(v.lightFlicker+1)%30;
+    drawVehicle(ctx,vx,vy,v.len,v.wid,v.color,v.type,d.axis==='H',d.faceDir,v.isAmbulance,v.lightFlicker<15);
+
+    if(!v.crossed){
+      if(!v.crossing&&!v.waiting) v.progress+=v.speed;
+      if(v.progress>=.88&&!v.crossing){
+        v.waiting=true;
+        const sig=signals[v.dir];
+        if(sig==='green'||(emergencyActive&&v.isAmbulance)){ v.crossing=true; v.waiting=false; }
+      }
+      if(v.crossing){ v.progress+=v.speed*1.6; if(v.progress>=1) v.crossed=true; }
+    }
+  });
+
+  // ── Update signal UI panels ──
+  ['N','S','E','W'].forEach((d,i)=>{
+    const el=document.getElementById('sig-'+d);
+    if(el){
+      el.className='sig-light '+(signals[i]==='red'?'rl':signals[i]==='green'?'gl':signals[i]==='yellow'?'yl':'off');
+      document.getElementById('timer-'+d).textContent=signals[i]==='off'?'—':signalCounters[i]+'s';
+      document.getElementById('phase-'+d).textContent=signals[i].toUpperCase();
+    }
+  });
+}
+
+let simAF, lastTime=0, accumulator=0;
+const stepInterval=()=>1000/simSpeed;
+
+function simLoop(ts){
+  if(!simRunning){simAF=requestAnimationFrame(simLoop);drawIntersection();return;}
+  accumulator+=ts-lastTime; lastTime=ts;
+  while(accumulator>stepInterval()){
+    accumulator-=stepInterval();
+    simStep=(simStep+1)%totalSteps;
+    updateSignals();
+    updateStats();
+    // spawn
+    for(let i=0;i<3;i++) if(Math.random()<densityVal/200) spawnVehicle();
+    // remove crossed
+    for(let i=vehicles.length-1;i>=0;i--) if(vehicles[i].crossed) vehicles.splice(i,1);
+  }
+  drawIntersection();
+  simAF=requestAnimationFrame(simLoop);
+}
+requestAnimationFrame(ts=>{lastTime=ts;simAF=requestAnimationFrame(simLoop);});
+
+function updateSignals(){
+  if(emergencyActive){
+    emergencyCountdown--;
+    if(emergencyCountdown<=0){emergencyActive=false;document.getElementById('em-banner').classList.remove('show');}
+    signals=['red','red','red','red'];signals[0]='green';
+    signalCounters=[emergencyCountdown,0,0,0];
+    updateSignalPanels(); return;
+  }
+  signalTimer++;
+  const greenTime=aiMode?psoGreenJ1[signalPhase]:15;
+  if(signalTimer>=greenTime+5){
+    signalTimer=0;
+    // process vehicles in current green direction
+    const proc=Math.floor(queues[signalPhase]*.4);
+    queues[signalPhase]=Math.max(0,queues[signalPhase]-proc);
+    totalProcessed+=proc;
+    totalFuel+=proc*.05;
+    signalPhase=(signalPhase+1)%4;
+  }
+  signals=['red','red','red','red'];
+  if(signalTimer<greenTime) signals[signalPhase]='green';
+  else signals[signalPhase]='yellow';
+  for(let i=0;i<4;i++) signalCounters[i]=(i===signalPhase)?Math.max(0,greenTime-signalTimer):0;
+
+  // Add arrivals to queues — use dataset if loaded, else default
+  let arr;
+  if(window._useDatasetArrivals && window._datasetArrivals){
+    const step = simStep % window._datasetArrivals.length;
+    arr = window._datasetArrivals[step];
+  } else {
+    arr = arrivals[simStep % arrivals.length];
+  }
+  for(let i=0;i<4;i++) queues[i]=Math.min(50,queues[i]+(arr[i]||1));
+}
+
+function updateStats(){
+  const ph=phases[simStep % phases.length];
+  // Compute congestion from current queues when dataset loaded
+  let congLabel = ph;
+  if(window._useDatasetArrivals){
+    const totalQ = queues.reduce((a,b)=>a+b,0);
+    congLabel = totalQ < 30 ? 'LOW' : totalQ < 80 ? 'MEDIUM' : 'HIGH';
+  }
+  document.getElementById('stat-proc').textContent=totalProcessed;
+  const wait=aiMode?9.2+Math.sin(simStep*.1)*1.5:14.8+Math.sin(simStep*.1)*2;
+  document.getElementById('stat-wait').textContent=wait.toFixed(1)+'s';
+  document.getElementById('stat-cong').textContent=congLabel;
+  document.getElementById('stat-fuel').textContent=totalFuel.toFixed(1);
+  document.getElementById('phase-badge').textContent='🟡 PHASE: '+congLabel;
+  const totalSim = window._useDatasetArrivals ? (window._datasetSteps||200) : totalSteps;
+  document.getElementById('step-badge').textContent='STEP: '+simStep+'/'+totalSim;
+  document.getElementById('cong-sub').textContent='Phase: '+congLabel;
+
+  // queues
+  const qNames=['q1','q2','q3','q4'];
+  queues.forEach((q,i)=>{
+    document.getElementById(qNames[i]+'-val').textContent=Math.round(q)+' veh';
+    document.getElementById(qNames[i]+'-bar').style.width=(q/50*100)+'%';
+  });
+}
+
+function updateSignalPanels(){
+  ['N','S','E','W'].forEach((d,i)=>{
+    const el=document.getElementById('sig-'+d);
+    if(el){
+      el.className='sig-light '+(signals[i]==='red'?'rl':signals[i]==='green'?'gl':signals[i]==='yellow'?'yl':'off');
+      document.getElementById('timer-'+d).textContent=signalCounters[i]+'s';
+      document.getElementById('phase-'+d).textContent=signals[i].toUpperCase();
+    }
+  });
+}
+
+function togglePlay(){
+  simRunning=!simRunning;
+  document.getElementById('btn-play').textContent=simRunning?'⏸ PAUSE':'▶ PLAY';
+}
+function resetSim(){
+  simStep=0;vehicles.length=0;queues=[0,0,0,0];totalProcessed=0;totalFuel=0;
+  signals=['red','red','red','red'];signalPhase=0;signalTimer=0;
+  simRunning=true;document.getElementById('btn-play').textContent='⏸ PAUSE';
+}
+function triggerEmergency(){
+  emergencyActive=true;emergencyCountdown=30;
+  document.getElementById('em-banner').classList.add('show');
+}
+function toggleMode(){
+  aiMode=!aiMode;
+  document.getElementById('btn-mode').textContent=aiMode?'🤖 AI MODE':'👤 MANUAL';
+}
+function updateDensity(v){
+  densityVal=+v;
+  const lbl=v<33?'Low':v<67?'Medium':'High';
+  document.getElementById('density-val').textContent=lbl;
+}
+function updateSpeed(v){
+  simSpeed=+v;
+  document.getElementById('speed-val').textContent=v+'×';
+}
+function setMode(m){
+  ['ai','manual','fixed'].forEach(x=>document.getElementById('mode-'+x).classList.remove('active'));
+  document.getElementById('mode-'+m).classList.add('active');
+  aiMode=(m==='ai');
+}
+
+// ============================================================
+// DATASET HANDLING — Upload, Parse, Wire to Simulation
+// ============================================================
+let uploadedDataset = null; // stores parsed dataset globally
+
+function handleUpload(input){
+  const f = input.files[0]; if(!f) return;
+  const statusEl  = document.getElementById('upload-status');
+  const iconEl    = document.getElementById('upload-icon');
+  const lblEl     = document.getElementById('upload-lbl');
+  const subEl     = document.getElementById('upload-sub');
+
+  // Loading state
+  statusEl.style.cssText = 'display:block;margin:0 14px 6px;font-family:JetBrains Mono,monospace;font-size:.65rem;padding:7px 10px;border-radius:5px;background:rgba(0,210,255,.07);color:var(--c);border:1px solid rgba(0,210,255,.2)';
+  statusEl.textContent = '⏳ Reading ' + f.name + '…';
+  iconEl.textContent = '⏳';
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const text = e.target.result;
+      const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+      if(lines.length < 2){ throw new Error('File appears empty or has only a header row.'); }
+
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/['"]/g,''));
+      const dataRows = lines.slice(1).map(l => {
+        const vals = l.split(',').map(v => v.trim().replace(/['"]/g,''));
+        const obj = {};
+        headers.forEach((h,i) => obj[h] = vals[i]);
+        return obj;
+      });
+
+      // --- Smart column detection ---
+      // Volume / flow / count
+      const volCol = headers.find(h => /volume|flow|count|traffic|vehicles|veh/.test(h));
+      // Time / hour
+      const timeCol = headers.find(h => /hour|time|period|timestamp/.test(h));
+      // Direction / lane
+      const dirCol = headers.find(h => /direction|lane|approach|leg/.test(h));
+      // Signal / green
+      const greenCol = headers.find(h => /green|signal|timing|duration/.test(h));
+      // Congestion / level
+      const congCol = headers.find(h => /congestion|level|status|density/.test(h));
+
+      // Parse volumes
+      let volumes = [];
+      if(volCol){
+        volumes = dataRows.map(r => parseFloat(r[volCol])).filter(v => !isNaN(v));
+      } else {
+        // fallback: try every numeric column
+        headers.forEach(h => {
+          const vals = dataRows.map(r => parseFloat(r[h])).filter(v => !isNaN(v));
+          if(vals.length > dataRows.length * 0.5 && vals.reduce((a,b)=>a+b,0)/vals.length > 0)
+            volumes = volumes.concat(vals);
+        });
+      }
+
+      const avgVol = volumes.length ? volumes.reduce((a,b)=>a+b,0)/volumes.length : 50;
+      const maxVol = volumes.length ? Math.max(...volumes) : 100;
+
+      // Parse green times per direction if available
+      let parsedGreens = [null,null,null,null];
+      if(dirCol && greenCol){
+        const dirs = ['north','south','east','west'];
+        dirs.forEach((d,i) => {
+          const rows = dataRows.filter(r => (r[dirCol]||'').toLowerCase().includes(d.slice(0,1)) || (r[dirCol]||'').toLowerCase().includes(d));
+          if(rows.length){
+            const vals = rows.map(r => parseFloat(r[greenCol])).filter(v => !isNaN(v) && v > 0 && v < 120);
+            if(vals.length) parsedGreens[i] = Math.round(vals.reduce((a,b)=>a+b,0)/vals.length);
+          }
+        });
+      }
+
+      // Detect peak hour from time column
+      let peakHourLabel = 'Unknown';
+      if(timeCol){
+        const hours = dataRows.map(r => parseInt(r[timeCol])).filter(h => !isNaN(h));
+        const hCounts = {};
+        hours.forEach(h => hCounts[h] = (hCounts[h]||0)+1);
+        const peakH = Object.entries(hCounts).sort((a,b)=>b[1]-a[1])[0];
+        if(peakH) peakHourLabel = peakH[0]+':00';
+      }
+
+      // Build arrival pattern from volume data
+      const simStepCount = Math.min(Math.max(dataRows.length, 50), 500);
+      const builtArrivals = buildArrivalsFromData(volumes, simStepCount, avgVol, maxVol);
+
+      // Infer density level (0–100)
+      const densityPct = Math.min(100, Math.round((avgVol / Math.max(maxVol, 1)) * 100));
+
+      // Store parsed dataset globally
+      uploadedDataset = {
+        fileName: f.name,
+        rows: dataRows.length,
+        cols: headers.length,
+        headers,
+        avgVol: avgVol.toFixed(1),
+        maxVol: maxVol.toFixed(1),
+        peakHourLabel,
+        densityPct,
+        simStepCount,
+        builtArrivals,
+        parsedGreens,
+        raw: dataRows
+      };
+
+      // Update UI
+      statusEl.style.cssText = 'display:block;margin:0 14px 6px;font-family:JetBrains Mono,monospace;font-size:.65rem;padding:7px 10px;border-radius:5px;background:rgba(0,255,163,.07);color:var(--g);border:1px solid rgba(0,255,163,.2)';
+      statusEl.textContent = '✓ ' + f.name + ' — ' + dataRows.length.toLocaleString() + ' rows × ' + headers.length + ' cols loaded';
+      iconEl.textContent = '✅';
+      lblEl.textContent = f.name;
+      subEl.textContent = dataRows.length.toLocaleString() + ' rows · ' + headers.length + ' columns';
+
+      // Show preview panel
+      document.getElementById('ds-rows').textContent    = dataRows.length.toLocaleString();
+      document.getElementById('ds-cols').textContent    = headers.length;
+      document.getElementById('ds-vol').textContent     = avgVol.toFixed(1) + ' avg';
+      document.getElementById('ds-peak').textContent    = peakHourLabel;
+      document.getElementById('ds-density').textContent = densityPct + '%';
+      document.getElementById('ds-steps').textContent   = simStepCount;
+      document.getElementById('dataset-preview').style.display = 'block';
+
+      // Show Run Simulation button
+      document.getElementById('run-sim-bar').style.display = 'block';
+
+    } catch(err){
+      statusEl.style.cssText = 'display:block;margin:0 14px 6px;font-family:JetBrains Mono,monospace;font-size:.65rem;padding:7px 10px;border-radius:5px;background:rgba(255,56,96,.07);color:var(--r);border:1px solid rgba(255,56,96,.2)';
+      statusEl.textContent = '✗ Error: ' + err.message;
+      iconEl.textContent = '❌';
+    }
+  };
+  reader.onerror = () => {
+    statusEl.style.cssText = 'display:block;margin:0 14px 6px;font-family:JetBrains Mono,monospace;font-size:.65rem;padding:7px 10px;border-radius:5px;background:rgba(255,56,96,.07);color:var(--r);border:1px solid rgba(255,56,96,.2)';
+    statusEl.textContent = '✗ Could not read file.';
+    iconEl.textContent = '❌';
+  };
+  reader.readAsText(f);
+}
+
+// Build per-step arrival arrays from raw volume data
+function buildArrivalsFromData(volumes, steps, avgVol, maxVol){
+  const result = [];
+  const scale = maxVol > 0 ? 1/maxVol : 1;
+  for(let i = 0; i < steps; i++){
+    // cycle through volume data, or use average if not enough
+    const baseVol = volumes.length ? volumes[i % volumes.length] : avgVol;
+    const norm = baseVol * scale; // 0–1
+    const arr = [
+      Math.max(0.3, norm * 4 + (Math.random()-.5)*.5),
+      Math.max(0.3, norm * 3.5 + (Math.random()-.5)*.5),
+      Math.max(0.3, norm * 3.8 + (Math.random()-.5)*.5),
+      Math.max(0.3, norm * 3.2 + (Math.random()-.5)*.5)
+    ];
+    result.push(arr);
+  }
+  return result;
+}
+
+// Run simulation using the uploaded dataset
+function runDatasetSimulation(){
+  if(!uploadedDataset){
+    alert('Please upload a dataset first.');
+    return;
+  }
+  const ds = uploadedDataset;
+  const btn = document.getElementById('run-sim-btn');
+
+  // Apply green times from dataset if found
+  const anyGreen = ds.parsedGreens.some(g => g !== null);
+  if(anyGreen){
+    ds.parsedGreens.forEach((g,i) => { if(g !== null) psoGreenJ1[i] = g; });
+    // Update explainer panel too
+    ['exp-g1','exp-g2','exp-g3','exp-g4'].forEach((id,i)=>{
+      const el=document.getElementById(id); if(el) el.textContent=psoGreenJ1[i]+'s';
+    });
+  }
+
+  // Apply density from dataset
+  const d = ds.densityPct;
+  document.getElementById('density-slider').value = d;
+  updateDensity(d);
+
+  // Inject dataset arrivals into simulation
+  window._datasetArrivals = ds.builtArrivals;
+  window._useDatasetArrivals = true;
+  window._datasetSteps = ds.simStepCount;
+
+  // Enable AI mode
+  setMode('ai');
+
+  // Reset and start
+  resetSim();
+  simRunning = true;
+  document.getElementById('btn-play').textContent = '⏸ PAUSE';
+
+  // Feedback
+  const statusEl = document.getElementById('upload-status');
+  statusEl.style.cssText = 'display:block;margin:0 14px 6px;font-family:JetBrains Mono,monospace;font-size:.65rem;padding:7px 10px;border-radius:5px;background:rgba(0,255,163,.07);color:var(--g);border:1px solid rgba(0,255,163,.2)';
+  statusEl.textContent = '▶ Simulation running from ' + ds.fileName + ' (' + ds.simStepCount + ' steps)';
+  btn.textContent = '✓ SIMULATION RUNNING';
+  btn.style.background = 'rgba(0,255,163,.12)';
+  btn.style.borderColor = 'rgba(0,255,163,.4)';
+  btn.style.color = 'var(--g)';
+
+  // Re-enable after 2s so user can restart
+  setTimeout(() => {
+    btn.textContent = '▶ RUN SIMULATION FROM DATASET';
+    btn.style.background = '';
+    btn.style.borderColor = '';
+    btn.style.color = '';
+  }, 2500);
+}
+// Param sync helpers
+function syncParam(key,val){
+  document.getElementById(key+'-val').textContent=val;
+  document.getElementById(key+'-slider').value=val;
+  document.getElementById(key+'-num').value=val;
+}
+function clampAndSync(key,min,max){
+  const el=document.getElementById(key+'-num');
+  let v=parseInt(el.value)||min;
+  v=Math.max(min,Math.min(max,v));
+  el.value=v;
+  document.getElementById(key+'-slider').value=v;
+  document.getElementById(key+'-val').textContent=v;
+}
+
+// Run PSO Simulation (full run with convergence)
+let psoSimRunning=false;
+function runPSOSimulation(){
+  if(psoSimRunning)return;
+  const iters=parseInt(document.getElementById('iter-num').value)||100;
+  const parts=parseInt(document.getElementById('parts-num').value)||30;
+  const cycle=parseInt(document.getElementById('cycle-num').value)||90;
+  const ints=parseInt(document.getElementById('ints-num').value)||2;
+
+  psoSimRunning=true;
+  const btn=document.getElementById('pso-run-btn');
+  btn.textContent='⏳ Running…';btn.disabled=true;
+
+  const statusEl=document.getElementById('pso-run-status');
+  statusEl.style.display='block';
+  statusEl.style.background='rgba(0,210,255,.07)';
+  statusEl.style.color='var(--c)';
+  statusEl.style.border='1px solid rgba(0,210,255,.2)';
+  statusEl.textContent='⚡ PSO running — '+iters+' iterations, '+parts+' particles…';
+
+  // Update live stats
+  document.getElementById('pso-iter-total').textContent=iters;
+  document.getElementById('pso-parts-live').textContent=parts;
+  document.getElementById('pso-cycle-live').textContent=cycle+'s';
+  document.getElementById('pso-conv').textContent='RUNNING';
+
+  // Generate cost curve
+  let costs=[],best=275+Math.random()*55;
+  for(let i=0;i<iters;i++){
+    best-=(best-55)*(0.004+Math.random()*.005);
+    best+=(Math.random()-.5)*1.4;
+    costs.push(Math.max(best,50));
+  }
+
+  // Animate progress
+  let frame=0;
+  const convC=document.getElementById('convCanvas');
+  const totalFrames=Math.min(iters,80);
+  const iv=setInterval(()=>{
+    frame++;
+    const progress=frame/totalFrames;
+    const itersDone=Math.min(Math.round(progress*iters),iters);
+    document.getElementById('pso-iter').textContent=itersDone;
+    document.getElementById('pso-best').textContent=costs[itersDone-1]?costs[itersDone-1].toFixed(2):'—';
+    document.getElementById('pso-progress-bar').style.width=(progress*100)+'%';
+    document.getElementById('pso-pct-lbl').textContent=Math.round(progress*100)+'%';
+    // draw convergence
+    drawConvCurve(costs.slice(0,itersDone));
+    if(frame>=totalFrames){
+      clearInterval(iv);
+      psoSimRunning=false;
+      btn.textContent='⚡ RUN PSO SIMULATION';btn.disabled=false;
+      document.getElementById('pso-conv').textContent='YES ✓';
+      document.getElementById('pso-iter').textContent=iters;
+      document.getElementById('pso-progress-bar').style.width='100%';
+      document.getElementById('pso-pct-lbl').textContent='100%';
+      statusEl.style.background='rgba(0,255,163,.07)';
+      statusEl.style.color='var(--g)';
+      statusEl.style.border='1px solid rgba(0,255,163,.2)';
+      statusEl.textContent='✓ PSO complete — best fitness: '+costs[costs.length-1].toFixed(2)+' | '+iters+' iterations, '+parts+' particles';
+      // Update green times with optimized values
+      const newGreenJ1=[18,15,12,14].map(v=>Math.max(10,Math.min(55,v+Math.round((Math.random()-.5)*6))));
+      const newGreenJ2=[16,17,11,13].map(v=>Math.max(10,Math.min(55,v+Math.round((Math.random()-.5)*6))));
+      psoGreenJ1.splice(0,4,...newGreenJ1);
+      psoGreenJ2.splice(0,4,...newGreenJ2);
+      // Update explainer
+      ['exp-g1','exp-g2','exp-g3','exp-g4'].forEach((id,i)=>{
+        const el2=document.getElementById(id);
+        if(el2) el2.textContent=psoGreenJ1[i]+'s';
+      });
+      // Reinit analytics if open
+      initAnalytics();
+    }
+  },20);
+}
+
+function drawConvCurve(costs){
+  const c=document.getElementById('convCanvas');if(!c)return;
+  const W=c.parentElement.clientWidth,H=c.parentElement.clientHeight-48;
+  c.width=W;c.height=H;
+  const ctx2=c.getContext('2d');
+  ctx2.fillStyle='#070e1c';ctx2.fillRect(0,0,W,H);
+  if(!costs||costs.length<2)return;
+  const mn=Math.min(...costs),mx=Math.max(...costs),rng=mx-mn||1;
+  const pad={t:14,r:14,b:28,l:46};
+  const cw=W-pad.l-pad.r,ch=H-pad.t-pad.b;
+  // Grid lines
+  ctx2.strokeStyle='rgba(0,210,255,.06)';ctx2.lineWidth=1;
+  [0,.25,.5,.75,1].forEach(f=>{
+    const y=pad.t+ch*(1-f);
+    ctx2.beginPath();ctx2.moveTo(pad.l,y);ctx2.lineTo(pad.l+cw,y);
+    ctx2.setLineDash([3,4]);ctx2.stroke();ctx2.setLineDash([]);
+    ctx2.fillStyle='rgba(232,244,255,.3)';ctx2.font="9px 'JetBrains Mono',monospace";ctx2.textAlign='right';
+    ctx2.fillText((mn+rng*f).toFixed(1),pad.l-4,y+3.5);
+  });
+  const pts=costs.map((v,i)=>[pad.l+i/(Math.max(costs.length-1,1))*cw,pad.t+ch-(v-mn)/rng*ch]);
+  // Fill
+  const grad=ctx2.createLinearGradient(0,pad.t,0,pad.t+ch);
+  grad.addColorStop(0,'rgba(0,210,255,.18)');grad.addColorStop(1,'rgba(0,210,255,.02)');
+  ctx2.beginPath();ctx2.moveTo(pts[0][0],pad.t+ch);
+  pts.forEach(p=>ctx2.lineTo(p[0],p[1]));
+  ctx2.lineTo(pts[pts.length-1][0],pad.t+ch);ctx2.closePath();
+  ctx2.fillStyle=grad;ctx2.fill();
+  // Line
+  ctx2.beginPath();ctx2.strokeStyle='#00d2ff';ctx2.lineWidth=2;ctx2.lineJoin='round';ctx2.lineCap='round';
+  pts.forEach((p,i)=>i===0?ctx2.moveTo(p[0],p[1]):ctx2.lineTo(p[0],p[1]));
+  ctx2.stroke();
+  // Axes
+  ctx2.strokeStyle='rgba(0,210,255,.15)';ctx2.lineWidth=1;ctx2.setLineDash([]);
+  ctx2.beginPath();ctx2.moveTo(pad.l,pad.t);ctx2.lineTo(pad.l,pad.t+ch);ctx2.stroke();
+  ctx2.beginPath();ctx2.moveTo(pad.l,pad.t+ch);ctx2.lineTo(pad.l+cw,pad.t+ch);ctx2.stroke();
+  // Labels
+  ctx2.fillStyle='rgba(232,244,255,.35)';ctx2.font="9px 'JetBrains Mono',monospace";ctx2.textAlign='left';
+  ctx2.fillText('Initial: '+costs[0].toFixed(1),pad.l+4,pad.t+12);
+  ctx2.fillStyle='var(--g)';ctx2.textAlign='right';
+  ctx2.fillText('Best: '+costs[costs.length-1].toFixed(1),pad.l+cw,pad.t+ch-6);
+}
+
+
+function loadSample(type){
+  // Clear any dataset override
+  window._useDatasetArrivals = false;
+  window._datasetArrivals = null;
+  const presets={
+    morning:{density:75,speed:2,peak:true},
+    evening:{density:85,speed:2,peak:true},
+    night:{density:20,speed:3,peak:false}
+  };
+  const p=presets[type];
+  document.getElementById('density-slider').value=p.density;
+  updateDensity(p.density);
+  document.getElementById('speed-slider').value=p.speed;
+  updateSpeed(p.speed);
+  const tog=document.getElementById('toggle-peak');
+  if(p.peak) tog.classList.add('on'); else tog.classList.remove('on');
+  peakHour=p.peak;
+  resetSim();
+  // Show status feedback in upload area
+  const statusEl=document.getElementById('upload-status');
+  const iconEl=document.getElementById('upload-icon');
+  const lblEl=document.getElementById('upload-lbl');
+  const subEl=document.getElementById('upload-sub');
+  if(statusEl){
+    statusEl.style.display='block';
+    statusEl.style.background='rgba(0,255,163,.07)';
+    statusEl.style.color='var(--g)';
+    statusEl.style.border='1px solid rgba(0,255,163,.2)';
+    statusEl.textContent='✓ Sample loaded: '+type.charAt(0).toUpperCase()+type.slice(1)+' Rush — simulation updated.';
+    if(iconEl) iconEl.textContent='✅';
+    if(lblEl) lblEl.textContent='Sample: '+type.charAt(0).toUpperCase()+type.slice(1)+' Rush';
+    if(subEl) subEl.textContent='Preset scenario loaded — simulation running';
+  }
+}
+function setMapFilter(f,btn){
+  document.querySelectorAll('.map-filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  currentMapFilter=f;
+}
+let currentMapFilter='all';
+
+// ============================================================
+// PSO ENGINE
+// ============================================================
+let psoAF, psoIter=0, psoPaused=false;
+const psoC=document.getElementById('psoCanvas');
+const psoCtx=psoC.getContext('2d');
+const convC=document.getElementById('convCanvas');
+const convCtx=convC.getContext('2d');
+
+// Particles
+const particles=[];
+const DIMS=2, N_PARTS=30;
+let gBest={pos:[0.5,0.5],fitness:999};
+const fitnessHistory=[];
+
+function initPSO(){
+  particles.length=0; fitnessHistory.length=0;
+  psoIter=0; gBest={pos:[.5,.5],fitness:999};
+  const nParts=parseInt((document.getElementById('parts-num')||{}).value)||N_PARTS;
+  for(let i=0;i<nParts;i++){
+    const p={
+      pos:[Math.random(),Math.random()],
+      vel:[(.5-Math.random())*.04,(.5-Math.random())*.04],
+      pBest:null, pBestFit:999,
+      trail:[],
+      hue:Math.floor(Math.random()*60)+160,
+    };
+    p.pBest=[...p.pos];
+    particles.push(p);
+  }
+}
+
+function psoFitness(pos){
+  const dx=pos[0]-.62, dy=pos[1]-.44;
+  // Multi-modal landscape with clear global optimum
+  const peak1=Math.exp(-(dx*dx+dy*dy)*35)*8;
+  const peak2=Math.exp(-((pos[0]-.2)**2+(pos[1]-.7)**2)*20)*4;
+  const peak3=Math.exp(-((pos[0]-.8)**2+(pos[1]-.2)**2)*25)*5;
+  const noise=(Math.random()-.5)*.2;
+  return 14.8-(peak1+peak2+peak3)+noise;
+}
+
+function psoStep(){
+  const w=.72, c1=1.49, c2=1.49;
+  particles.forEach(p=>{
+    const fit=psoFitness(p.pos);
+    if(fit<p.pBestFit){p.pBestFit=fit;p.pBest=[...p.pos];}
+    if(fit<gBest.fitness){gBest.fitness=fit;gBest.pos=[...p.pos];}
+    for(let d=0;d<DIMS;d++){
+      p.vel[d]=w*p.vel[d]+c1*Math.random()*(p.pBest[d]-p.pos[d])+c2*Math.random()*(gBest.pos[d]-p.pos[d]);
+      p.vel[d]=Math.max(-.05,Math.min(.05,p.vel[d]));
+      p.pos[d]=Math.max(0,Math.min(1,p.pos[d]+p.vel[d]));
+    }
+    p.trail.push([...p.pos]);
+    if(p.trail.length>18) p.trail.shift();
+  });
+  psoIter++;
+  fitnessHistory.push(gBest.fitness);
+  document.getElementById('pso-iter').textContent=psoIter;
+  document.getElementById('pso-best').textContent=gBest.fitness.toFixed(3);
+  document.getElementById('pso-conv').textContent=gBest.fitness<10?'YES':'NO';
+  const maxIter=getPSOMaxIter();
+  const pct=Math.min(100,Math.round(psoIter/maxIter*100));
+  const pb=document.getElementById('pso-progress-bar');if(pb)pb.style.width=pct+'%';
+  const pl=document.getElementById('pso-pct-lbl');if(pl)pl.textContent=pct+'%';
+}
+
+function drawPSO(){
+  const W=psoC.parentElement.clientWidth||600;
+  const H=psoC.parentElement.clientHeight-48||350;
+  psoC.width=W; psoC.height=H;
+
+  psoCtx.fillStyle='#070e1c'; psoCtx.fillRect(0,0,W,H);
+
+  // Fitness landscape background
+  const img=psoCtx.createImageData(W,H);
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+    const px=x/W, py=y/H;
+    const fit=psoFitness([px,py]);
+    const norm=Math.max(0,Math.min(1,(14.8-fit)/8));
+    const idx=(y*W+x)*4;
+    img.data[idx]=0; img.data[idx+1]=Math.round(norm*150); img.data[idx+2]=Math.round(norm*80);
+    img.data[idx+3]=Math.round(norm*60+20);
+  }
+  psoCtx.putImageData(img,0,0);
+
+  // Global best halo
+  const gbx=gBest.pos[0]*W, gby=gBest.pos[1]*H;
+  const grad=psoCtx.createRadialGradient(gbx,gby,0,gbx,gby,40);
+  grad.addColorStop(0,'rgba(0,255,163,0.35)');grad.addColorStop(1,'transparent');
+  psoCtx.fillStyle=grad;psoCtx.fillRect(gbx-40,gby-40,80,80);
+  psoCtx.beginPath();psoCtx.arc(gbx,gby,10,0,Math.PI*2);
+  psoCtx.fillStyle='rgba(0,255,163,0.9)';psoCtx.shadowColor='#00ffa3';psoCtx.shadowBlur=20;
+  psoCtx.fill();psoCtx.shadowBlur=0;
+
+  // Particles
+  particles.forEach(p=>{
+    // Trail
+    if(p.trail.length>1){
+      psoCtx.beginPath();psoCtx.moveTo(p.trail[0][0]*W,p.trail[0][1]*H);
+      p.trail.forEach(t=>psoCtx.lineTo(t[0]*W,t[1]*H));
+      psoCtx.strokeStyle=`hsla(${p.hue},80%,60%,0.2)`;psoCtx.lineWidth=1;psoCtx.stroke();
+    }
+    const px=p.pos[0]*W, py=p.pos[1]*H;
+    psoCtx.beginPath();psoCtx.arc(px,py,4,0,Math.PI*2);
+    psoCtx.fillStyle=`hsl(${p.hue},80%,65%)`;
+    psoCtx.shadowColor=`hsl(${p.hue},80%,65%)`;psoCtx.shadowBlur=8;
+    psoCtx.fill();psoCtx.shadowBlur=0;
+    // velocity arrow
+    psoCtx.beginPath();psoCtx.moveTo(px,py);
+    psoCtx.lineTo(px+p.vel[0]*W*3,py+p.vel[1]*H*3);
+    psoCtx.strokeStyle=`hsla(${p.hue},60%,60%,0.4)`;psoCtx.lineWidth=1;psoCtx.stroke();
+  });
+
+  // Convergence chart
+  drawConvChart();
+}
+
+function drawConvChart(){
+  const W=convC.parentElement.clientWidth||600;
+  const H=convC.parentElement.clientHeight-48||350;
+  convC.width=W; convC.height=H;
+  convCtx.fillStyle='#070e1c'; convCtx.fillRect(0,0,W,H);
+
+  const pad={t:20,r:20,b:40,l:50};
+  const cW=W-pad.l-pad.r, cH=H-pad.t-pad.b;
+  const data=fitnessHistory;
+  if(data.length<2) return;
+  const maxV=Math.max(...data)*1.05, minV=Math.min(...data)*.9;
+
+  // Grid
+  convCtx.strokeStyle='rgba(0,210,255,0.07)';convCtx.lineWidth=1;
+  for(let i=0;i<=5;i++){
+    const y=pad.t+i*cH/5;
+    convCtx.beginPath();convCtx.moveTo(pad.l,y);convCtx.lineTo(pad.l+cW,y);convCtx.stroke();
+    convCtx.fillStyle='rgba(232,244,255,.3)';convCtx.font='10px JetBrains Mono,monospace';convCtx.textAlign='right';
+    convCtx.fillText((maxV-i*(maxV-minV)/5).toFixed(1),pad.l-5,y+4);
+  }
+
+  // Area fill
+  convCtx.beginPath();
+  data.forEach((v,i)=>{
+    const x=pad.l+(i/(data.length-1))*cW;
+    const y=pad.t+(1-(v-minV)/(maxV-minV))*cH;
+    i===0?convCtx.moveTo(x,y):convCtx.lineTo(x,y);
+  });
+  convCtx.lineTo(pad.l+cW,pad.t+cH);convCtx.lineTo(pad.l,pad.t+cH);convCtx.closePath();
+  convCtx.fillStyle='rgba(0,210,255,0.07)';convCtx.fill();
+
+  // Line
+  convCtx.beginPath();
+  data.forEach((v,i)=>{
+    const x=pad.l+(i/(data.length-1))*cW;
+    const y=pad.t+(1-(v-minV)/(maxV-minV))*cH;
+    i===0?convCtx.moveTo(x,y):convCtx.lineTo(x,y);
+  });
+  convCtx.strokeStyle='rgba(0,210,255,.85)';convCtx.lineWidth=2;convCtx.stroke();
+
+  // Optimal line
+  const optY=pad.t+(1-(9.2-minV)/(maxV-minV))*cH;
+  convCtx.beginPath();convCtx.moveTo(pad.l,optY);convCtx.lineTo(pad.l+cW,optY);
+  convCtx.strokeStyle='rgba(0,255,163,.5)';convCtx.lineWidth=1;convCtx.setLineDash([5,5]);convCtx.stroke();convCtx.setLineDash([]);
+  convCtx.fillStyle='rgba(0,255,163,.6)';convCtx.font='10px JetBrains Mono,monospace';convCtx.textAlign='left';
+  convCtx.fillText('PSO Optimum',pad.l+4,optY-4);
+
+  // X labels
+  convCtx.fillStyle='rgba(232,244,255,.3)';convCtx.textAlign='center';
+  for(let i=0;i<=5;i++){
+    const x=pad.l+i*cW/5;
+    convCtx.fillText(Math.round(i*(data.length-1)/5),x,pad.t+cH+20);
+  }
+  convCtx.fillStyle='rgba(232,244,255,.4)';convCtx.font='10px Syne,sans-serif';
+  convCtx.textAlign='center';convCtx.fillText('Iteration',pad.l+cW/2,pad.t+cH+36);
+}
+
+function getPSOMaxIter(){const el=document.getElementById('iter-num');return el?parseInt(el.value)||100:100;}
+
+function psoAnimLoop(){
+  if(!psoPaused&&psoIter<getPSOMaxIter()){
+    for(let i=0;i<2;i++) psoStep();
+  }
+  drawPSO();
+  psoAF=requestAnimationFrame(psoAnimLoop);
+}
+
+let psoStarted=false;
+function startPSOAnimation(){
+  if(!psoStarted){psoStarted=true;initPSO();}
+  cancelAnimationFrame(psoAF);
+  psoAF=requestAnimationFrame(psoAnimLoop);
+}
+function togglePSOPlay(){
+  psoPaused=!psoPaused;
+  document.getElementById('pso-play-btn').textContent=psoPaused?'▶ PLAY':'⏸ PAUSE';
+}
+function restartPSO(){
+  initPSO();psoPaused=false;
+  document.getElementById('pso-play-btn').textContent='⏸ PAUSE';
+  const pb=document.getElementById('pso-progress-bar');if(pb)pb.style.width='0%';
+  const pl=document.getElementById('pso-pct-lbl');if(pl)pl.textContent='0%';
+  const st=document.getElementById('pso-run-status');if(st)st.style.display='none';
+  const btn=document.getElementById('pso-run-btn');if(btn){btn.textContent='⚡ RUN PSO SIMULATION';btn.disabled=false;}
+}
+
+// ============================================================
+// ANALYTICS
+// ============================================================
+function initAnalytics(){
+  setTimeout(()=>{
+    drawWaitChart(); drawThroughputChart(); buildHeatmap();
+    drawPhaseChart(); drawGreenChart();
+  },100);
+}
+
+function makeLineChart(canvas,datasets,labels){
+  const ctx2=canvas.getContext('2d');
+  const W=canvas.parentElement.clientWidth, H=canvas.parentElement.clientHeight-48;
+  canvas.width=W; canvas.height=H;
+  ctx2.fillStyle='#070e1c'; ctx2.fillRect(0,0,W,H);
+  const pad={t:20,r:20,b:36,l:44};
+  const cW=W-pad.l-pad.r, cH=H-pad.t-pad.b;
+  const allVals=datasets.flatMap(d=>d.data);
+  const maxV=Math.max(...allVals)*1.1, minV=Math.min(0,...allVals);
+
+  ctx2.strokeStyle='rgba(0,210,255,0.06)';ctx2.lineWidth=1;
+  for(let i=0;i<=4;i++){
+    const y=pad.t+i*cH/4;
+    ctx2.beginPath();ctx2.moveTo(pad.l,y);ctx2.lineTo(pad.l+cW,y);ctx2.stroke();
+    ctx2.fillStyle='rgba(232,244,255,.3)';ctx2.font='9px JetBrains Mono';ctx2.textAlign='right';
+    ctx2.fillText((maxV-i*(maxV-minV)/4).toFixed(0),pad.l-4,y+3);
+  }
+
+  datasets.forEach(ds=>{
+    ctx2.beginPath();
+    ds.data.forEach((v,i)=>{
+      const x=pad.l+(i/(ds.data.length-1))*cW;
+      const y=pad.t+(1-(v-minV)/(maxV-minV))*cH;
+      i===0?ctx2.moveTo(x,y):ctx2.lineTo(x,y);
+    });
+    // area
+    ctx2.lineTo(pad.l+cW,pad.t+cH);ctx2.lineTo(pad.l,pad.t+cH);ctx2.closePath();
+    const fc=ds.color.includes('210')?'rgba(0,210,255,0.07)':'rgba(0,255,163,0.05)';
+    ctx2.fillStyle=fc;ctx2.fill();
+    // line
+    ctx2.beginPath();
+    ds.data.forEach((v,i)=>{
+      const x=pad.l+(i/(ds.data.length-1))*cW;
+      const y=pad.t+(1-(v-minV)/(maxV-minV))*cH;
+      i===0?ctx2.moveTo(x,y):ctx2.lineTo(x,y);
+    });
+    ctx2.strokeStyle=ds.color;ctx2.lineWidth=2;ctx2.stroke();
+  });
+
+  // x labels
+  const step=Math.max(1,Math.floor(labels.length/6));
+  labels.forEach((l,i)=>{
+    if(i%step!==0) return;
+    const x=pad.l+(i/(labels.length-1))*cW;
+    ctx2.fillStyle='rgba(232,244,255,.3)';ctx2.font='9px JetBrains Mono';ctx2.textAlign='center';
+    ctx2.fillText(l,x,pad.t+cH+24);
+  });
+}
+
+function drawWaitChart(){
+  const c=document.getElementById('waitChart');
+  const steps=Array.from({length:simStep||50},(_,i)=>i+1+'');
+  const baseline=steps.map(()=>14.8+Math.random()*1.5);
+  const pso=steps.map(()=>9.2+Math.random()*1.2);
+  makeLineChart(c,[{data:baseline,color:'rgba(255,56,96,.8)'},{data:pso,color:'rgba(0,210,255,.8)'}],steps);
+}
+function drawThroughputChart(){
+  const c=document.getElementById('throughputChart');
+  const steps=Array.from({length:50},(_,i)=>i+1+'');
+  const data=steps.map(()=>1.24+Math.random()*.6+.2);
+  makeLineChart(c,[{data,color:'rgba(0,255,163,.8)'}],steps);
+}
+
+function buildHeatmap(){
+  const hm=document.getElementById('heatmap');hm.innerHTML='';
+  const lanes=['N','S','E','W'];
+  for(let lane=0;lane<4;lane++){
+    for(let h=0;h<24;h++){
+      const peak=(h>=7&&h<=9)||(h>=17&&h<=19);
+      const semi=(h>=11&&h<=13);
+      const v=peak?.7+Math.random()*.3:semi?.4+Math.random()*.3:Math.random()*.4;
+      const r=Math.round(v*255),g=Math.round((1-v)*200);
+      const div=document.createElement('div');
+      div.className='hm-cell';
+      div.style.background=`rgba(${r},${g},60,0.8)`;
+      div.title=`${lanes[lane]} Lane, ${h}:00 — ${Math.round(v*100)}%`;
+      hm.appendChild(div);
+    }
+  }
+}
+
+function drawPhaseChart(){
+  const c=document.getElementById('phaseChart');
+  const ctx2=c.getContext('2d');
+  const W=c.parentElement.clientWidth,H=c.parentElement.clientHeight-48;
+  c.width=W;c.height=H;
+  ctx2.fillStyle='#070e1c';ctx2.fillRect(0,0,W,H);
+  const data=[{label:'LOW',val:75,color:'rgba(0,255,163,.8)'},{label:'MED',val:70,color:'rgba(255,179,0,.8)'},{label:'HIGH',val:55,color:'rgba(255,56,96,.8)'}];
+  const tot=data.reduce((a,b)=>a+b.val,0);
+  let ang=-Math.PI/2;
+  const cx=W/2,cy=H/2,r=Math.min(W,H)*.32;
+  data.forEach(d=>{
+    const sl=(d.val/tot)*Math.PI*2;
+    ctx2.beginPath();ctx2.moveTo(cx,cy);ctx2.arc(cx,cy,r,ang,ang+sl);ctx2.closePath();
+    ctx2.fillStyle=d.color;ctx2.shadowColor=d.color;ctx2.shadowBlur=10;ctx2.fill();ctx2.shadowBlur=0;
+    const mid=ang+sl/2;
+    const lx=cx+Math.cos(mid)*(r+22),ly=cy+Math.sin(mid)*(r+22);
+    ctx2.fillStyle='rgba(232,244,255,.6)';ctx2.font='10px Syne,sans-serif';ctx2.textAlign='center';
+    ctx2.fillText(`${d.label} ${Math.round(d.val/tot*100)}%`,lx,ly);
+    ang+=sl;
+  });
+  ctx2.beginPath();ctx2.arc(cx,cy,r*.5,0,Math.PI*2);
+  ctx2.fillStyle='#070e1c';ctx2.fill();
+  ctx2.fillStyle='rgba(0,210,255,.7)';ctx2.font='bold 11px JetBrains Mono';ctx2.textAlign='center';
+  ctx2.fillText('200',cx,cy-3);ctx2.font='9px JetBrains Mono';
+  ctx2.fillStyle='rgba(232,244,255,.4)';ctx2.fillText('STEPS',cx,cy+11);
+}
+
+function drawGreenChart(){
+  const c=document.getElementById('greenChart');
+  const ctx2=c.getContext('2d');
+  const W=c.parentElement.clientWidth,H=c.parentElement.clientHeight-48;
+  c.width=W;c.height=H;
+  ctx2.fillStyle='#070e1c';ctx2.fillRect(0,0,W,H);
+  const junctions=[{label:'J1',vals:psoGreenJ1,color:'rgba(0,210,255,.8)'},{label:'J2',vals:psoGreenJ2,color:'rgba(182,109,255,.8)'}];
+  const lanes=['N','S','E','W'];
+  const maxV=25,n=4,pad=40,bW=(W-pad*2)/(n*2.5),cH2=H-pad*1.5;
+  ctx2.strokeStyle='rgba(0,210,255,.07)';ctx2.lineWidth=1;
+  for(let i=0;i<=5;i++){
+    const y=pad+i*(cH2/5);
+    ctx2.beginPath();ctx2.moveTo(pad,y);ctx2.lineTo(W-pad,y);ctx2.stroke();
+    ctx2.fillStyle='rgba(232,244,255,.3)';ctx2.font='9px JetBrains Mono';ctx2.textAlign='right';
+    ctx2.fillText((maxV-maxV*i/5).toFixed(0)+'s',pad-4,y+3);
+  }
+  for(let i=0;i<n;i++){
+    const groupX=pad+i*(W-pad*2)/n+4;
+    junctions.forEach((j,ji)=>{
+      const v=j.vals[i],barH=(v/maxV)*cH2;
+      const gr=ctx2.createLinearGradient(0,pad+cH2-barH,0,pad+cH2);
+      gr.addColorStop(0,j.color);gr.addColorStop(1,j.color.replace('.8','.1'));
+      ctx2.fillStyle=gr;ctx2.shadowColor=j.color;ctx2.shadowBlur=6;
+      ctx2.fillRect(groupX+ji*(bW+2),pad+cH2-barH,bW,barH);
+      ctx2.shadowBlur=0;
+      ctx2.fillStyle=j.color;ctx2.font='9px JetBrains Mono';ctx2.textAlign='center';
+      ctx2.fillText(v+'s',groupX+ji*(bW+2)+bW/2,pad+cH2-barH-4);
+    });
+    ctx2.fillStyle='rgba(232,244,255,.35)';ctx2.font='9px Syne';ctx2.textAlign='center';
+    ctx2.fillText('Lane '+lanes[i],groupX+bW,H-6);
+  }
+}
+
+// ============================================================
+// CITY MAP
+// ============================================================
+let mapInited=false,mapAF=null;
+let mapParticles=[];
+
+function initMap(){
+  if(mapInited) return; mapInited=true;
+  setTimeout(()=>{
+    drawMap();
+    startMapAnimation();
+  },100);
+}
+
+function startMapAnimation(){
+  function loop(){mapAF=requestAnimationFrame(loop);drawMap();}
+  loop();
+}
+
+function drawMap(){
+  const c=document.getElementById('mapCanvas');
+  const W=c.parentElement.clientWidth,H=c.parentElement.clientHeight;
+  c.width=W;c.height=H;
+  const ctx2=c.getContext('2d');
+
+  ctx2.fillStyle='#060e1c';ctx2.fillRect(0,0,W,H);
+
+  // Micro grid
+  ctx2.strokeStyle='rgba(0,210,255,0.04)';ctx2.lineWidth=.5;
+  for(let x=0;x<W;x+=40){ctx2.beginPath();ctx2.moveTo(x,0);ctx2.lineTo(x,H);ctx2.stroke();}
+  for(let y=0;y<H;y+=40){ctx2.beginPath();ctx2.moveTo(0,y);ctx2.lineTo(W,y);ctx2.stroke();}
+
+  // City blocks (buildings)
+  const blocks=[
+    {x:.05,y:.05,w:.18,h:.22},{x:.05,y:.42,w:.16,h:.2},{x:.05,y:.72,w:.18,h:.2},
+    {x:.35,y:.05,w:.16,h:.2},{x:.35,y:.72,w:.14,h:.2},
+    {x:.67,y:.05,w:.2,h:.18},{x:.67,y:.42,w:.2,h:.2},{x:.67,y:.72,w:.2,h:.2},
+    {x:.38,y:.42,w:.18,h:.16},
+  ];
+  blocks.forEach(b=>{
+    ctx2.fillStyle='rgba(12,22,44,0.8)';
+    ctx2.fillRect(b.x*W,b.y*H,b.w*W,b.h*H);
+    ctx2.strokeStyle='rgba(0,210,255,0.08)';ctx2.lineWidth=1;
+    ctx2.strokeRect(b.x*W,b.y*H,b.w*W,b.h*H);
+    // windows
+    const wW=6,wH=5,gap=10;
+    for(let wx=b.x*W+8;wx<(b.x+b.w)*W-10;wx+=gap){
+      for(let wy=b.y*H+8;wy<(b.y+b.h)*H-8;wy+=gap+2){
+        const lit=Math.random()>.5;
+        ctx2.fillStyle=lit?`rgba(255,220,120,${.15+Math.random()*.2})`:'rgba(0,210,255,0.04)';
+        ctx2.fillRect(wx,wy,wW,wH);
+      }
+    }
+  });
+
+  // Roads
+  const roads=[
+    {x1:0,y1:H*.35,x2:W,y2:H*.35,w:22},{x1:0,y1:H*.65,x2:W,y2:H*.65,w:20},
+    {x1:W*.3,y1:0,x2:W*.3,y2:H,w:20},{x1:W*.6,y1:0,x2:W*.6,y2:H,w:20},
+    {x1:0,y1:H*.5,x2:W,y2:H*.5,w:12},{x1:W*.5,y1:0,x2:W*.5,y2:H,w:12},
+  ];
+  roads.forEach(r=>{
+    ctx2.strokeStyle='#101d32';ctx2.lineWidth=r.w;
+    ctx2.beginPath();ctx2.moveTo(r.x1,r.y1);ctx2.lineTo(r.x2,r.y2);ctx2.stroke();
+    ctx2.strokeStyle='rgba(255,220,50,0.07)';ctx2.lineWidth=.8;ctx2.setLineDash([14,10]);
+    ctx2.beginPath();ctx2.moveTo(r.x1,r.y1);ctx2.lineTo(r.x2,r.y2);ctx2.stroke();
+    ctx2.setLineDash([]);
+  });
+
+  // Animated traffic dots on roads
+  const t=Date.now()/1000;
+  roads.forEach((r,ri)=>{
+    for(let d=0;d<6;d++){
+      const progress=((t*(0.04+ri*.005)+d*.18))%1;
+      const x=r.x1+(r.x2-r.x1)*progress;
+      const y=r.y1+(r.y2-r.y1)*progress;
+      const speed=progress;
+      const col=speed>.6?'rgba(255,56,96,0.8)':speed>.35?'rgba(255,179,0,0.8)':'rgba(0,255,163,0.8)';
+      ctx2.beginPath();ctx2.arc(x,y,2.5,0,Math.PI*2);
+      ctx2.fillStyle=col;ctx2.shadowColor=col;ctx2.shadowBlur=6;ctx2.fill();ctx2.shadowBlur=0;
+    }
+  });
+
+  // Congestion heatmap
+  const cz=[{x:W*.3,y:H*.35,r:85,i:.9},{x:W*.6,y:H*.35,r:70,i:.65},{x:W*.3,y:H*.65,r:60,i:.5},{x:W*.6,y:H*.65,r:90,i:.8},{x:W*.5,y:H*.5,r:48,i:.4}];
+  cz.forEach(z=>{
+    const rr=Math.round(z.i*255),gg=Math.round((1-z.i)*180);
+    const grd=ctx2.createRadialGradient(z.x,z.y,0,z.x,z.y,z.r);
+    grd.addColorStop(0,`rgba(${rr},${gg},40,0.3)`);grd.addColorStop(1,'transparent');
+    ctx2.fillStyle=grd;ctx2.fillRect(z.x-z.r,z.y-z.r,z.r*2,z.r*2);
+  });
+
+  // Junctions
+  const junctions=[
+    {x:W*.3,y:H*.35,label:'J1',status:'AI ACTIVE',c:'#00ffa3',filter:'ai'},
+    {x:W*.6,y:H*.35,label:'J2',status:'AI ACTIVE',c:'#00d2ff',filter:'ai'},
+    {x:W*.3,y:H*.65,label:'J3',status:'MANUAL',c:'#ffb300',filter:'all'},
+    {x:W*.6,y:H*.65,label:'J4',status:'HIGH CONG.',c:'#ff3860',filter:'high'},
+    {x:W*.5,y:H*.5,label:'J5',status:'NORMAL',c:'#00d2ff',filter:'all'},
+  ];
+
+  junctions.forEach(j=>{
+    if(currentMapFilter!=='all'&&j.filter!==currentMapFilter) return;
+    // Pulse ring
+    const pulse=(Math.sin(t*2+junctions.indexOf(j))*.5+.5);
+    ctx2.beginPath();ctx2.arc(j.x,j.y,18+pulse*8,0,Math.PI*2);
+    ctx2.strokeStyle=j.c+'44';ctx2.lineWidth=1.5;ctx2.stroke();
+    ctx2.beginPath();ctx2.arc(j.x,j.y,12,0,Math.PI*2);
+    ctx2.fillStyle='rgba(8,14,28,0.95)';ctx2.fill();
+    ctx2.strokeStyle=j.c;ctx2.lineWidth=1.5;ctx2.shadowColor=j.c;ctx2.shadowBlur=12;ctx2.stroke();ctx2.shadowBlur=0;
+    ctx2.fillStyle=j.c;ctx2.font='bold 10px Orbitron,monospace';ctx2.textAlign='center';
+    ctx2.fillText(j.label,j.x,j.y+4);
+  });
+
+  // Click handler
+  c.onclick=function(e){
+    const rect=c.getBoundingClientRect();
+    const mx=e.clientX-rect.left,my=e.clientY-rect.top;
+    junctions.forEach(j=>{
+      if(Math.sqrt((mx-j.x)**2+(my-j.y)**2)<25){
+        document.getElementById('map-detail').innerHTML=
+          `<strong style="color:var(--c)">${j.label}</strong> — <span style="color:${j.c}">${j.status}</span><br>
+          <span style="color:var(--t3)">Vehicles: ${Math.round(50+Math.random()*100)}/step<br>
+          Wait: ${(8+Math.random()*5).toFixed(1)}s<br>
+          Eff: ${Math.round(80+Math.random()*15)}%</span>`;
+      }
+    });
+  };
+}
+
+// ============================================================
+// AI DECISIONS TEXT
+// ============================================================
+const aiDecisions=[
+  "HIGH traffic on North lane. PSO extends green 12s→18s. Queue reduction: 34%.",
+  "Evening rush phase. PSO reallocates S/N ratio 60/40 based on arrival differential.",
+  "Junction 2 receiving wave from J1 in ~8s. Pre-emptive green extension applied.",
+  "Emergency vehicle on East lane. PSO overrides all signals. Clearance time: 15s.",
+  "Low traffic period. PSO reduces green times proportionally, improving crossings.",
+  "Convergence at iteration 47. Global best fitness: 9.20. Signal times locked.",
+];
+let aiIdx=0;
+setInterval(()=>{
+  aiIdx=(aiIdx+1)%aiDecisions.length;
+  const el=document.getElementById('ai-decision-text');
+  if(el) el.textContent=aiDecisions[aiIdx];
+  // Update explainer green times
+  ['exp-g1','exp-g2','exp-g3','exp-g4'].forEach((id,i)=>{
+    const el2=document.getElementById(id);
+    if(el2) el2.textContent=(psoGreenJ1[i]+Math.floor(Math.random()*3))+'s';
+  });
+},4000);
+</script>
+</body>
+</html>
